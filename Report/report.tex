@@ -1,0 +1,100 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx}
+\usepackage[a4paper, left = 3.5cm, right = 3.5cm, top = 3.5cm, bottom = 3.5cm ]{geometry}
+\usepackage{listings}
+\usepackage{amssymb}
+\usepackage{pgfplots} 
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{centernot}
+
+\newtheorem{definition}{Definition}
+\newtheorem{example}{Exmaple}
+\newtheorem{property}{Property}
+\newtheorem{proof}{Proof}
+\newcommand{\norm}[1]{\lVert#1\rVert}
+\newcommand{\abs}[1]{\lvert#1\rvert}
+
+\begin{document}
+	
+	\begin{titlepage}
+		
+		\title{Project of Distributed Systems: Paradigms and Models \\
+		Iterative Jacobi Method}
+		\author{Student: Diego Arcelli\\ Matricola: 647979 \\
+			Professor: Marco  Danelutto}
+		\maketitle
+		\centering
+		\includegraphics[width=10cm]{./images/unipi_logo.png}
+		
+	\end{titlepage}
+	
+	\tableofcontents
+	\newpage
+	
+	\section{Description of the problem}
+	The Jacobi method is an iterative algorithm which can be applied to solve systems of linear equations of the form:
+	\[ Ax = b\]
+	where $A \in \mathbb{R}^{n\times n}$ is the coefficient matrix, $b \in \mathbb{R}^n$ is the constant terms vector and $x\in \mathbb{R}^n$ is the unknown vector that we want to compute. The idea of Jacobi algorithm is to decompose $A$ as a sum of three matrices:
+	\[ A = D + U + L\]
+	where $D$ is a diagonal matrix, $U$ is an upper-triangular matrix and $L$ is a lower-triangular matrix. Then we compute iteratively:
+	\[ x^{(k+1)} =  D^{-1}[b-(U+L)x^{(k)}] \]
+	where $x^{(k)}$ indicates the value of $x$ at the $k$-th iteration. Actually at each iteration $k$ we can compute independently every component $i$ of the array using the equation:
+	\begin{equation}
+		\label{eqn:iteration}
+		x^{(k+1)}_i = \frac{1}{a_{i,i}}\Big(b_i - \sum_{j=1}^n a_{i,j}x^{(k)}_j\Big)
+	\end{equation}
+	where $x_i$ indicates the $i$-th component of vector $x$. Discussing further details of the algorithm is beyond the scope of this project. 
+	
+	\section{Analysis of the problem}
+	The pseudo-code to execute the algorithm sequentially for a fixed amount of iteration $l$, is shown in \ref{alg:seq}. Note that at each iteration we're forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because suppose that at iteration $k+1$, we compute the updated value for the $i$-th component $x^{(k+1)}_i$ and we modify $x$ in-place, then when we compute the update for the next component $x^{(k+1)}_{i+1}$ we won't use $x^{k}_i$, but we will use $x^{k+1}_i$, which is not mathematically correct. The algorithm is composed by an three nested loops, where the first iterates $l$ times, the other two iterate $n$ times, and all the other operations can be done in constant time, so the total time complexity is $O(ln^2)$.
+	\begin{algorithm}[H]
+		\caption{Sequential code for Jacobi method}\label{alg:seq}
+		\begin{algorithmic}
+			\Require $A$ matrix, $b$ and $x$ vectors, $l$ positive integer
+			\For{$k \leftarrow 1$ to $l$}
+			\For{$i \leftarrow 1 $ to $n$}
+			\State{$val \leftarrow 0$}
+			\For{$j \leftarrow 1 $ to $n$}
+			\State{$val \leftarrow val + A[i,j]* x[j]$}
+			\EndFor
+			\State{$x^\prime[i] \leftarrow \frac{1}{A[i,i]}(b[i]-val)$}
+			\EndFor
+			\For{$i \leftarrow i$ to $n$}
+			\State{$x[i] \leftarrow x^\prime[i]$}
+			\EndFor
+			\EndFor
+		\end{algorithmic}
+	\end{algorithm}
+	Let's now analyze how we can exploit the properties of the problems in order to parallelize the algorithm. The first important thing we notice is that in order to compute the updated values for the vector $x$ at iteration $k$, we need the full updated vector $x$ at iteration $k-1$, therefore the iterations of the algorithm needs to be strictly sequential. So let's focus on understanding what we can parallelize inside a single iteration. As we said in the description of the problem, at each iteration $k$ every component of the new vector $x^{(k+1)}$ can be computed independently from the others components using the formula in equation $\ref{eqn:iteration}$. So this is a data parallel computation where (for the reasons described before) we cannot modify the vector $x$ in place. So we can parallelize the code by assigning to each worker a different partition of components of $x$ to update in the auxiliary vector $x^\prime$.\\
+	Another part of the code which can be parallelized is the for loop used to copy the updated values from $x^\prime$ to $x$, since each iteration $i$ updates only the $i$-th element of $x$. However, as we already discussed, before executing the copies, all the workers must have finished to update their chunk of vector, otherwise if a worker $w_1$ executes the copies of its chunk, while a worker $w_2$ is still computing the updates of its partition, this would compromise $w_2$ computations since to execute the updates $w_2$ needs to access to the components of $x$ updated by $w_1$. Basically we simply need to put a barrier between the update phase and the copy phase.\\
+	Actually another barrier is needed to assure that all the workers ended their copy phase before starting the next iteration, otherwise it might happen that some workers start the next iteration working on not updated values of $x$.\\
+	The last thing we need to discuss is how to stop the the execution of the workers after $l$ iteration. This can be easily implemented by selecting one of the worker to maintain a counter of the number of iterations. Between the update and next iteration barrier we can check whether the id number of the worker is a specific one, and if it is the case update the iteration counter. This solution does not require mutual exclusion, since the counter is modified by just one worker, moreover it guarantees the correctness of the program since, because of the next iteration barrier, all the worker will test the condition of the while loop with the same value of the current iteration. \\
+	The routine of a single worker is described in \ref{alg:par-updates}, where of course $start$ and $end$ are two variables to store respectively the first and the last index of the chunk of the worker, assuming that each worker works on a contiguous partition of indices.
+	\begin{algorithm}[H]
+		\caption{Single worker routine}\label{alg:par-updates}
+		\begin{algorithmic}
+			\Require $A$ matrix, $b$ and $x$ vectors, $l$ positive integer
+			\While{$k < l$}
+			\State {$val \leftarrow 0$}
+			\For{$i \leftarrow start$ to $end$}
+				\For{$j \leftarrow 1 $ to $n$}
+				\State{$val \leftarrow val + A[i,j]* x[j]$}
+				\EndFor
+				\State{$x^\prime[i] \leftarrow \frac{1}{A[i,i]}(b[i]-val)$}
+			\EndFor
+			\State{\textbf{Updates barrier}}
+			\For{$i \leftarrow start$ to $end$}
+			\State{$x[i] \leftarrow x^\prime[i]$}
+			\EndFor
+			\If{$wid$ $ = 1$}
+			$k\leftarrow k + 1$
+			\EndIf
+			\State{\textbf{Next iteration barrier}}
+			\EndWhile
+		\end{algorithmic}
+	\end{algorithm}
+	
+
+\end{document}
