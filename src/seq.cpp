@@ -2,7 +2,7 @@
 #include <ctime>
 #include <cstdlib>
 
-typedef double real;
+typedef long double real;
 
 void print_matrix(real** A, int n, int m) {
     for (int i = 0; i < n; i++) {

@@ -71,6 +71,12 @@
 	Another part of the code which can be parallelized is the for loop used to copy the updated values from $x^\prime$ to $x$, since each iteration $i$ updates only the $i$-th element of $x$. However, as we already discussed, before executing the copies, all the workers must have finished to update their chunk of vector, otherwise if a worker $w_1$ executes the copies of its chunk, while a worker $w_2$ is still computing the updates of its partition, this would compromise $w_2$ computations since to execute the updates $w_2$ needs to access to the components of $x$ updated by $w_1$. Basically we simply need to put a barrier between the update phase and the copy phase.\\
 	Actually another barrier is needed to assure that all the workers ended their copy phase before starting the next iteration, otherwise it might happen that some workers start the next iteration working on not updated values of $x$.\\
 	The last thing we need to discuss is how to stop the the execution of the workers after $l$ iteration. This can be easily implemented by selecting one of the worker to maintain a counter of the number of iterations. Between the update and next iteration barrier we can check whether the id number of the worker is a specific one, and if it is the case update the iteration counter. This solution does not require mutual exclusion, since the counter is modified by just one worker, moreover it guarantees the correctness of the program since, because of the next iteration barrier, all the worker will test the condition of the while loop with the same value of the current iteration. \\
+	
+	Actually there's still another part in the code which might been further parallelized. The for loop used to compute $A[i,j]*x[j]$ for $j=1,\dots, n$ is a summation of $n-1$ elements, so it's a classical case of an application of a reduce pattern. However the reduce is used inside the map, so basically we ave a pattern of the following form:
+	\[ 
+	map(reduce(sum, n^2_w), n^1_w)
+	\]
+	
 	The routine of a single worker is described in \ref{alg:par-updates}, where of course $start$ and $end$ are two variables to store respectively the first and the last index of the chunk of the worker, assuming that each worker works on a contiguous partition of indices.
 	\begin{algorithm}[H]
 		\caption{Single worker routine}\label{alg:par-updates}
