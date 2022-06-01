@@ -45,10 +45,10 @@
 		\label{eqn:iteration}
 		x^{(k+1)}_i = \frac{1}{a_{i,i}}\Big(b_i - \sum_{j=1}^n a_{i,j}x^{(k)}_j\Big)
 	\end{equation}
-	where $x_i$ indicates the $i$-th component of vector $x$. Discussing further details of the algorithm is beyond the scope of this project. 
+	where $x_i$ indicates the $i$-th component of vector $x$. Discussing further details of the algorithm is beyond the scope of this project.
 	
 	\section{Analysis of the problem}
-	The pseudo-code to execute the algorithm sequentially for a fixed amount of iteration $l$, is shown in \ref{alg:seq}. Note that at each iteration we're forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because suppose that at iteration $k+1$, we compute the updated value for the $i$-th component $x^{(k+1)}_i$ and we modify $x$ in-place, then when we compute the update for the next component $x^{(k+1)}_{i+1}$ we won't use $x^{k}_i$, but we will use $x^{k+1}_i$, which is not mathematically correct. The algorithm is composed by an three nested loops, where the first iterates $l$ times, the other two iterate $n$ times, and all the other operations can be done in constant time, so the total time complexity is $O(ln^2)$.
+	The pseudo-code to execute the algorithm sequentially for a fixed amount of iteration $l$, is shown in \ref{alg:seq}. Note that at each iteration we're forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because suppose that at iteration $k+1$, we compute the updated value for the $i$-th component $x^{(k+1)}_i$ and we modify $x$ in-place, then when we compute the update for the next component $x^{(k+1)}_{i+1}$ we won't use $x^{k}_i$, but we will use $x^{k+1}_i$, which is not mathematically correct. The algorithm is composed by an three nested loops, where the first iterates $l$ times, the other two iterate $n$ times, and all the other operations can be done in constant time, so the total time complexity is $O(ln^2)$. Actually we can optimize the code, by avoiding to do the copy loop, if we see $x$ and $x\prime$ as pointers (which is ok since in C++ arrays are pointers), we can simply swap the addresses that they're pointing instead of copying every element of $x\prime$ in $x$. In this way we substitute the $O(l)$ copy loop, with a $O(1)$ swap operation, even thou the overall cost of the iteration is still $O(n^2)$.
 	\begin{algorithm}[H]
 		\caption{Sequential code for Jacobi method}\label{alg:seq}
 		\begin{algorithmic}
@@ -68,41 +68,15 @@
 		\end{algorithmic}
 	\end{algorithm}
 	Let's now analyze how we can exploit the properties of the problems in order to parallelize the algorithm. The first important thing we notice is that in order to compute the updated values for the vector $x$ at iteration $k$, we need the full updated vector $x$ at iteration $k-1$, therefore the iterations of the algorithm needs to be strictly sequential. So let's focus on understanding what we can parallelize inside a single iteration. As we said in the description of the problem, at each iteration $k$ every component of the new vector $x^{(k+1)}$ can be computed independently from the others components using the formula in equation $\ref{eqn:iteration}$. So this is a data parallel computation where (for the reasons described before) we cannot modify the vector $x$ in place. So we can parallelize the code by assigning to each worker a different partition of components of $x$ to update in the auxiliary vector $x^\prime$.\\
-	Another part of the code which can be parallelized is the for loop used to copy the updated values from $x^\prime$ to $x$, since each iteration $i$ updates only the $i$-th element of $x$. However, as we already discussed, before executing the copies, all the workers must have finished to update their chunk of vector, otherwise if a worker $w_1$ executes the copies of its chunk, while a worker $w_2$ is still computing the updates of its partition, this would compromise $w_2$ computations since to execute the updates $w_2$ needs to access to the components of $x$ updated by $w_1$. Basically we simply need to put a barrier between the update phase and the copy phase.\\
-	Actually another barrier is needed to assure that all the workers ended their copy phase before starting the next iteration, otherwise it might happen that some workers start the next iteration working on not updated values of $x$.\\
-	The last thing we need to discuss is how to stop the the execution of the workers after $l$ iteration. This can be easily implemented by selecting one of the worker to maintain a counter of the number of iterations. Between the update and next iteration barrier we can check whether the id number of the worker is a specific one, and if it is the case update the iteration counter. This solution does not require mutual exclusion, since the counter is modified by just one worker, moreover it guarantees the correctness of the program since, because of the next iteration barrier, all the worker will test the condition of the while loop with the same value of the current iteration. \\
-	Actually there's still another part of the code which might been further parallelized. The for loop used to compute $A[i,j]*x[j]$ for $j=1,\dots, n$ is a summation of $n-1$ elements, so it's a classical case of an application of a reduce pattern. However the reduce is used inside the map, so overall we have a parallel pattern of the following form:
-	\[ map(reduce(+, nw_2), nw_1)\]
-	where $nw_1$ is the number of workers used in the map and $nw_2$ is the number of workers used by each worker in the sum to compute the reduce. If the total number of workers in our system is $nw$, then the following equality must holds:
-	\[ nw = nw_1 + nw_1\cdot nw_2\]
-	For example if our machine has 32 workers, we might decide to use 8 of them for the map, and then inside the map worker will use 3 other workers for the reduce. Note that the map used to copy the elements from the auxiliary to the main array happens after the copy barrier, so in this second map we can use all the workers of the system. 
-	
-	\iffalse
-	The routine of a single worker is described in \ref{alg:par-updates}, where of course $start$ and $end$ are two variables to store respectively the first and the last index of the chunk of the worker, assuming that each worker works on a contiguous partition of indices.
-	\begin{algorithm}[H]
-		\caption{Single worker routine}\label{alg:par-updates}
-		\begin{algorithmic}
-			\Require $A$ matrix, $b$ and $x$ vectors, $l$ positive integer
-			\While{$k < l$}
-			\State {$val \leftarrow 0$}
-			\For{$i \leftarrow start$ to $end$}
-				\For{$j \leftarrow 1 $ to $n$}
-				\State{$val \leftarrow val + A[i,j]* x[j]$}
-				\EndFor
-				\State{$x^\prime[i] \leftarrow \frac{1}{A[i,i]}(b[i]-val)$}
-			\EndFor
-			\State{\textbf{Updates barrier}}
-			\For{$i \leftarrow start$ to $end$}
-			\State{$x[i] \leftarrow x^\prime[i]$}
-			\EndFor
-			\If{$wid$ $ = 1$}
-			$k\leftarrow k + 1$
-			\EndIf
-			\State{\textbf{Next iteration barrier}}
-			\EndWhile
-		\end{algorithmic}
-	\end{algorithm}
-	\fi
-	
+	Inside this map operation we have a sum of $n-1$ elements, which is the classical case of a reduce pattern. So inside each map we can call a reduce in the following way:
+	\[
+	map(reduce(+,nw_2), nw_1)
+	\]
+	where $nw_1$ is the number of workers used for the map and $w_2$ is the number of workers used inside each map for the reduce, so the number of total workers $nw$ will be:
+	\[ nw = nw_1 \cdot nw_2 \]
+	Therefore, we have the problem of determine the best way to use the workers of the machine. \\
+	For the copy of $x\prime$ we can simply Basically we simply need to put a barrier between the update phase and the copy phase. Since before starting the copy, the previous map must be ended, for this second map we can use all the $nw_1\cdot nw_2$ workers that we have at disposal.\\
+	After the map is computed the swap of $x\prime$ and $x$ can be arbitrarily assigned to one of the workers. To do this, before the worker starts to swap the vectors we have to assure that all the other workers finished computing they're portion of $x\prime$. This can be achieved by simply putting a barrier between the map-reduce and the arrays swap. Actually another barrier is needed to assure that no workers starts the next iterations before the worker designated to the swap ended the computation, otherwise it might happen that some workers start the next iteration working with not swapped $x\prime$ and $x$.\\
+	The last thing we need to discuss is how to stop the the execution of the workers after $l$ iteration. This can be easily implemented by using the worker assigned to the swap to also increase the iterations counter. This solution does not require mutual exclusion, since the counter is modified by just one worker, moreover it guarantees the correctness of the program since, all the workers will start the next iteration with the same value of the iteration counter.
 
 \end{document}
