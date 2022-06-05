@@ -6,7 +6,17 @@
 int main(int argc, char *argv[]) {
     
     srand(time(NULL));
-    int n = 18;
+
+    if (argc < 5) {
+        std::cout << "Usage: ./main n nw1 nw2 iters\n";
+        return 1; 
+    }
+
+    int n = atoi(argv[1]);
+    int nw1 = atoi(argv[2]);
+    int nw2 = atoi(argv[3]);
+    int iters = atoi(argv[4]);
+
     
     real** A = new real*[n];
     real* b = new real[n];
@@ -25,20 +35,20 @@ int main(int argc, char *argv[]) {
 
     {
         timer t("seq");
-        x = prob.sequential(1);
+        x = prob.sequential(iters);
     }
 
-    for (int i = 0; i < n; i++)
-        std::cout << x[i] << " ";
-    std::cout << "\n";
+    // for (int i = 0; i < n; i++)
+    //     std::cout << x[i] << " ";
+    // std::cout << "\n";
 
     {
         timer t("fff");
-        x = prob.parallel("ff", 1, 4, 2);
+        x = prob.parallel("ff", iters, nw1, nw2);
     }
-    for (int i = 0; i < n; i++)
-        std::cout << x[i] << " ";
-    std::cout << "\n";
+    // for (int i = 0; i < n; i++)
+    //     std::cout << x[i] << " ";
+    // std::cout << "\n";
 
 
     // x = prob.parallel("threads", 1000, 4, 2);

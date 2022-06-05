@@ -1,4 +1,4 @@
-FLAGS = -g -lpthread -fopenmp -O3 -I ${HOME}/fastflow -std=c++20
+FLAGS = -g -lpthread -fopenmp -I ${HOME}/fastflow -std=c++20 #-03
 
 main: main.o Jacobi.o timer.o
 	g++ -o main main.o Jacobi.o timer.o $(FLAGS)

@@ -163,6 +163,7 @@ real* Jacobi::parallel_ff(int iterations, int nw1, int nw2) {
     
     int k = 0;
     int nw = nw1*nw2;
+    int size = n/nw1;
     srand(time(NULL));
     real* x = new real[n];
     for (int i = 0; i < n; i++) x[i] = 10;// rand() % 10;
@@ -174,27 +175,54 @@ real* Jacobi::parallel_ff(int iterations, int nw1, int nw2) {
     ParallelForReduce<real>* pfr[nw1];
     for (int i = 0; i < nw1; i++) {
         pfr[i] = new ParallelForReduce<real>(nw2);
-    }    
+    }
+
+    ParallelForReduce<real> pfr1(nw2);   
 
     while (k < iterations) {
-        pf.parallel_for(0, n, 1, 0, [&](const long i) {
-            real val = 0; 
-            int idx = (i/nw1 >= (nw1-1) ? nw1-1 : i/nw1);
-            pfr[idx]->parallel_reduce(val, 0, 0, n, 1, 0, [&](const long j, real& partial) {
-                partial = (j != i ? A[i][j]*x[j] : 0.0);
-            },
-            [](real& total, const real partial) {
-                total += partial;
-            }, nw2);
-            x_aux[i] = (1/A[i][i])/(b[i] - val);
-            DEBUG(i);
-        }, nw1);
-        std::cout << "ENDED PARALLEL FOR\n";
-   
-        temp = x_aux;
-        x_aux = x;
-        x = temp;
-        k++;
+
+        if (nw1 > 1) {
+
+            pf.parallel_for(0, n, 1, size, [&](const long i) {
+                real val = 0; 
+                if (nw2 != 0) {
+                    int idx = (i/size >= (nw1-1) ? nw1-1 : i/size);
+                    pfr[idx]->parallel_reduce(val, 0, 0, n, 1, n/nw2, [&](const long j, real& partial) {
+                        partial += (j != i ? A[i][j]*x[j] : 0.0);
+                    },
+                    [](real& total, const real partial) {
+                        total += partial;
+                    }, nw2);
+                } else {
+                    for (int j = 0; j < n; j++) {
+                        val += (j != i ? A[i][j]*x[j] : 0);
+                    }
+                }
+                x_aux[i] = (1/A[i][i])/(b[i] - val);
+            }, nw1);
+    
+            temp = x_aux;
+            x_aux = x;
+            x = temp;
+            k++;
+
+        } else {
+            real val;
+            for (int i = 0; i < n; i++) {
+                val = 0; 
+                pfr1.parallel_reduce(val, 0, 0, n, 1, n/nw2, [&](const long j, real& partial) {
+                    partial += (j != i ? A[i][j]*x[j] : 0.0);
+                },
+                [](real& total, const real partial) {
+                    total += partial;
+                }, nw2);
+            }
+
+            temp = x_aux;
+            x_aux = x;
+            x = temp;
+            k++;
+        }
     }
 
     return x;
