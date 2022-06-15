@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <thread>
 #include <iostream>
+#include <ff/ff.hpp>
 #include <ff/parallel_for.hpp>
 #include <barrier>
 #include <omp.h>
@@ -30,7 +31,7 @@ Jacobi::Jacobi(int n) {
 real* Jacobi::sequential(int iterations) {
     real* x = new real[n];
     srand(time(NULL));
-    for (int i = 0; i < n; i++) x[i] = 10;// rand() % 10;
+    for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
     real* x_aux = new real[n]; 
     real val;
     real* temp;
@@ -75,44 +76,20 @@ real* Jacobi::parallel_threads(int iterations, int nw1, int nw2) {
     real* temp;
     int nw = nw1*nw2;
     std::barrier copy_barrier(nw1, []() { return; });
-    std::barrier next_iteration_barrier(nw1*nw2, []() { return; });
-    std::thread tids[nw];
-    std::vector<std::pair<int, int>> reduce_chunks;
-    std::vector<std::pair<int, int>> map_chunks;
-    std::vector<std::vector<real>> partials;
+    std::barrier next_iteration_barrier(nw1, []() { return; });
+    std::thread tids[nw1];
 
-    // std::barrier<std::function<void(void)>> reduce_barriers[nw1];
-    
-    // std::vector<std::barrier<>> reduce_barriers(nw1);
-    for (int i = 0; i < nw1; i++) {
-        partials.push_back(std::vector<real>(nw2));
-        // reduce_barriers[i] = std::barrier(nw2);
-    }
-
-    int reduce_chunk_size = n/nw2;
-    for (int i = 0; i < nw2; i++) {
-        int start = i*reduce_chunk_size;
-        int end = (i == nw-1 ? n-1 : start + reduce_chunk_size - 1);
-        reduce_chunks.push_back(std::pair<int, int>(start, end));
-    }
-
-    int map_chunk_size = n/nw1;
-    for (int i = 0; i < nw1; i++) {
-        int start = i*map_chunk_size;
-        int end = (i == nw1-1 ? n-1 : start + map_chunk_size - 1);
-        map_chunks.push_back(std::pair<int, int>(start, end));
-    }
-
-
-    auto thread_map_task = [&](int start, int end, int reduce_start, int reduce_end){
+    std::function<void(int, int)> thread_map_task = [&](int start, int end){
 
         while (k < iterations) {
 
             // do the first map calling the reduce operations
             for (int i = start; i <= end; i++) {
-    
-                
-                
+                real val = 0;
+                for (int j = 0; j < n; j++) {
+                    val += (j != i ? A[i][j]*x[j] : 0);
+                }
+                x_aux[i] = (1/A[i][i])/(b[i] - val);
             }
 
             copy_barrier.arrive_and_wait();
@@ -129,33 +106,20 @@ real* Jacobi::parallel_threads(int iterations, int nw1, int nw2) {
 
     };
 
-    auto thread_reduce_task = [&](int start, int end, int row, int p_i, int p_j) {
-        while (k < iterations) {
-            partials[p_i][p_j] = 0.0;
-            for (int i = start; i <= end; i++){
-                partials[p_i][p_j] += (i != row ? A[row][i]*x[i] : 0.0);
-            }
-            next_iteration_barrier.arrive_and_wait();
-        }
-    };
-
-
-    for (int i = 0; i < nw; i++) {
-        // thread that have to handle the map
-        if (i % nw == 0) {
-
-        // thread that only have to reduce
-        } else {
-
-        }
+    int size = n/nw1;
+    for (int i = 0; i < nw1; i++) {
+        int start = i*size;
+        int end = (i != nw1-1 ? start + size - 1 : n-1);
+        tids[i] = std::thread(thread_map_task, start, end);
     }
 
-
-    for (int i = 0; i < nw; i++) {
+    for (int i = 0; i < nw1; i++) {
         tids[i].join();
     }
 
-    return nullptr;
+    delete x_aux;
+
+    return x;
 
 }
 
@@ -163,10 +127,9 @@ real* Jacobi::parallel_ff(int iterations, int nw1, int nw2) {
     
     int k = 0;
     int nw = nw1*nw2;
-    int size = n/nw1;
     srand(time(NULL));
     real* x = new real[n];
-    for (int i = 0; i < n; i++) x[i] = 10;// rand() % 10;
+    for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
     real* x_aux = new real[n]; 
     real* temp;
 
@@ -177,11 +140,13 @@ real* Jacobi::parallel_ff(int iterations, int nw1, int nw2) {
         pfr[i] = new ParallelForReduce<real>(nw2);
     }
 
-    ParallelForReduce<real> pfr1(nw2);   
+    ParallelForReduce<real> pfr1(nw2, true);   
 
     while (k < iterations) {
 
-        if (nw1 > 1) {
+        if (nw1 > 0) {
+
+            int size = n/nw1;
 
             pf.parallel_for(0, n, 1, size, [&](const long i) {
                 real val = 0; 
@@ -225,18 +190,34 @@ real* Jacobi::parallel_ff(int iterations, int nw1, int nw2) {
         }
     }
 
+    delete x_aux;
     return x;
 
 }
 
 real* Jacobi::parallel_omp(int iterations, int nw1, int nw2) {
 
-    int k = 0;
-    srand(time(NULL));
     real* x = new real[n];
+    srand(time(NULL));
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
-    real* x_new = new real[n]; 
-
-    return nullptr;
+    real* x_aux = new real[n]; 
+    real val;
+    real* temp;
+    for (int k = 0; k < iterations; k++) {
+        #pragma omp parallel for num_threads(nw1)
+        for (int i = 0; i < n; i++) {
+            val = 0;
+            //#pragma omp parallel for reduction(+ : val) num_threads(nw1)
+            for (int j = 0; j < n; j++) {
+                val += (j != i ? A[i][j]*x[j] : 0);
+            }
+            x_aux[i] = (1/A[i][i])/(b[i] - val);
+        }
+        temp = x_aux;
+        x_aux = x;
+        x = temp;
+    }
+    delete x_aux;
+    return x;
 
 }

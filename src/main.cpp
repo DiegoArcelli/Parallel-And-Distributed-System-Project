@@ -51,10 +51,24 @@ int main(int argc, char *argv[]) {
     // std::cout << "\n";
 
 
-    // x = prob.parallel("threads", 1000, 4, 2);
+    {
+        timer t("par");
+        x = prob.parallel("threads", iters, nw1, nw2);
+    }
     // for (int i = 0; i < n; i++)
     //     std::cout << x[i] << " ";
     // std::cout << "\n";
+
+
+    {
+        timer t("omp");
+        x = prob.parallel("omp", iters, nw1, nw2);
+    }
+    // for (int i = 0; i < n; i++) {
+    //     std::cout << x[i] << " ";
+    // }
+    // std::cout << "\n";
+
 
 
 

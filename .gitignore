@@ -5,3 +5,6 @@
 *.toc
 *.o
 main
+.vscode/
+src/tests/
+src/.vscode/
