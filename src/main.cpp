@@ -1,22 +1,19 @@
 #include <iostream>
 #include "Jacobi.hpp"
-#include "utils.hpp"
 #include "timer.hpp"
 
 int main(int argc, char *argv[]) {
     
     srand(time(NULL));
 
-    if (argc < 5) {
-        std::cout << "Usage: ./main n nw1 nw2 iters\n";
+    if (argc < 4) {
+        std::cout << "Usage: ./main n nw iters\n";
         return 1; 
     }
 
     int n = atoi(argv[1]);
-    int nw1 = atoi(argv[2]);
-    int nw2 = atoi(argv[3]);
-    int iters = atoi(argv[4]);
-
+    int nw = atoi(argv[2]);
+    int iters = atoi(argv[3]);
     
     real** A = new real*[n];
     real* b = new real[n];
@@ -44,7 +41,7 @@ int main(int argc, char *argv[]) {
 
     {
         timer t("fff");
-        x = prob.parallel("ff", iters, nw1, nw2);
+        x = prob.parallel("ff", iters, nw);
     }
     // for (int i = 0; i < n; i++)
     //     std::cout << x[i] << " ";
@@ -53,7 +50,7 @@ int main(int argc, char *argv[]) {
 
     {
         timer t("par");
-        x = prob.parallel("threads", iters, nw1, nw2);
+        x = prob.parallel("threads", iters, nw);
     }
     // for (int i = 0; i < n; i++)
     //     std::cout << x[i] << " ";
@@ -62,7 +59,7 @@ int main(int argc, char *argv[]) {
 
     {
         timer t("omp");
-        x = prob.parallel("omp", iters, nw1, nw2);
+        x = prob.parallel("omp", iters, nw);
     }
     // for (int i = 0; i < n; i++) {
     //     std::cout << x[i] << " ";
