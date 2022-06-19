@@ -33,14 +33,10 @@
 	\tableofcontents
 	\newpage
 	
-	\section{Description of the problem}
-	The Jacobi method is an iterative algorithm which can be applied to solve systems of linear equations of the form:
-	\[ Ax = b\]
-	where $A \in \mathbb{R}^{n\times n}$ is the coefficient matrix, $b \in \mathbb{R}^n$ is the constant terms vector and $x\in \mathbb{R}^n$ is the unknown vector that we want to compute. The idea of Jacobi algorithm is to decompose $A$ as a sum of three matrices:
-	\[ A = D + U + L\]
-	where $D$ is a diagonal matrix, $U$ is an upper-triangular matrix and $L$ is a lower-triangular matrix. Then we compute iteratively:
+	\section{Problem description}
+	The Jacobi method is an iterative algorithm which can be applied to solve systems of linear equations of the form $Ax = b$, where $A \in \mathbb{R}^{n\times n}$ is the coefficient matrix, $b \in \mathbb{R}^n$ is the constant terms vector and $x\in \mathbb{R}^n$ is the unknown vector that we want to compute. The algorithm compute iteratively $x$ as follows:
 	\[ x^{(k+1)} =  D^{-1}[b-(U+L)x^{(k)}] \]
-	where $x^{(k)}$ indicates the value of $x$ at the $k$-th iteration. Actually at each iteration $k$ we can compute independently every component $i$ of the array using the equation:
+	where $x^{(k)}$ indicates the value of $x$ at the $k$-th iteration. Actually at each iteration $k$ we can compute independently every component $i$ of the vector using the equation:
 	\begin{equation}
 		\label{eqn:iteration}
 		x^{(k+1)}_i = \frac{1}{a_{i,i}}\Big(b_i - \sum_{j=1}^n a_{i,j}x^{(k)}_j\Big)
@@ -48,35 +44,99 @@
 	where $x_i$ indicates the $i$-th component of vector $x$. Discussing further details of the algorithm is beyond the scope of this project.
 	
 	\section{Analysis of the problem}
-	The pseudo-code to execute the algorithm sequentially for a fixed amount of iteration $l$, is shown in \ref{alg:seq}. Note that at each iteration we're forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because suppose that at iteration $k+1$, we compute the updated value for the $i$-th component $x^{(k+1)}_i$ and we modify $x$ in-place, then when we compute the update for the next component $x^{(k+1)}_{i+1}$ we won't use $x^{k}_i$, but we will use $x^{k+1}_i$, which is not mathematically correct. The algorithm is composed by an three nested loops, where the first iterates $l$ times, the other two iterate $n$ times, and all the other operations can be done in constant time, so the total time complexity is $O(ln^2)$. Actually we can optimize the code, by avoiding to do the copy loop, if we see $x$ and $x\prime$ as pointers (which is ok since in C++ arrays are pointers), we can simply swap the addresses that they're pointing instead of copying every element of $x\prime$ in $x$. In this way we substitute the $O(l)$ copy loop, with a $O(1)$ swap operation, even thou the overall cost of the iteration is still $O(n^2)$.
+	The pseudo-code to execute the algorithm sequentially for a fixed amount of iteration $l$, is shown in \ref{alg:seq}. Note that at each iteration we're forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because if at iteration $k$, we compute $x^{(k)}_1$ modifying $x$ in-place, then when we compute $x^{(k+1)}_2$ instead of using $x^{(k)}_1$, we'll use $x^{(k+1)}_1$.\\ The algorithm is composed by three nested loops, where the first iterates $l$ times, and the other two iterate $n$ times, so the total time complexity is $O(ln^2)$. The swap function used in the pseudo-code to copy the elements of $x^\prime$ in $x$, can be implemented with $O(1)$ cost, by simply swapping the pointers of the two array (this works in C++ where we see as vectors).
 	\begin{algorithm}[H]
 		\caption{Sequential code for Jacobi method}\label{alg:seq}
-		\begin{algorithmic}
+		\begin{algorithmic}[1]
 			\Require $A$ matrix, $b$ and $x$ vectors, $l$ positive integer
-			\For{$k \leftarrow 1$ to $l$}
+			\For{$k \leftarrow 1$ to $limit$}
 			\For{$i \leftarrow 1 $ to $n$}
 			\State{$val \leftarrow 0$}
 			\For{$j \leftarrow 1 $ to $n$}
+			\If{$j \ne i$}
 			\State{$val \leftarrow val + A[i,j]* x[j]$}
+			\EndIf
 			\EndFor
 			\State{$x^\prime[i] \leftarrow \frac{1}{A[i,i]}(b[i]-val)$}
 			\EndFor
-			\For{$i \leftarrow i$ to $n$}
-			\State{$x[i] \leftarrow x^\prime[i]$}
-			\EndFor
+			\State{swap($x$, $x^\prime$)}
 			\EndFor
 		\end{algorithmic}
 	\end{algorithm}
-	Let's now analyze how we can exploit the properties of the problems in order to parallelize the algorithm. The first important thing we notice is that in order to compute the updated values for the vector $x$ at iteration $k$, we need the full updated vector $x$ at iteration $k-1$, therefore the iterations of the algorithm needs to be strictly sequential. So let's focus on understanding what we can parallelize inside a single iteration. As we said in the description of the problem, at each iteration $k$ every component of the new vector $x^{(k+1)}$ can be computed independently from the others components using the formula in equation $\ref{eqn:iteration}$. So this is a data parallel computation where (for the reasons described before) we cannot modify the vector $x$ in place. So we can parallelize the code by assigning to each worker a different partition of components of $x$ to update in the auxiliary vector $x^\prime$.\\
-	Inside this map operation we have a sum of $n-1$ elements, which is the classical case of a reduce pattern. So inside each map we can call a reduce in the following way:
-	\[
-	map(reduce(+,nw_2), nw_1)
-	\]
-	where $nw_1$ is the number of workers used for the map and $w_2$ is the number of workers used inside each map for the reduce, so the number of total workers $nw$ will be:
-	\[ nw = nw_1 \cdot nw_2 \]
-	Therefore, we have the problem of determine the best way to use the workers of the machine. \\
-	For the copy of $x\prime$ we can simply Basically we simply need to put a barrier between the update phase and the copy phase. Since before starting the copy, the previous map must be ended, for this second map we can use all the $nw_1\cdot nw_2$ workers that we have at disposal.\\
-	After the map is computed the swap of $x\prime$ and $x$ can be arbitrarily assigned to one of the workers. To do this, before the worker starts to swap the vectors we have to assure that all the other workers finished computing they're portion of $x\prime$. This can be achieved by simply putting a barrier between the map-reduce and the arrays swap. Actually another barrier is needed to assure that no workers starts the next iterations before the worker designated to the swap ended the computation, otherwise it might happen that some workers start the next iteration working with not swapped $x\prime$ and $x$.\\
-	The last thing we need to discuss is how to stop the the execution of the workers after $l$ iteration. This can be easily implemented by using the worker assigned to the swap to also increase the iterations counter. This solution does not require mutual exclusion, since the counter is modified by just one worker, moreover it guarantees the correctness of the program since, all the workers will start the next iteration with the same value of the iteration counter.
+	Let's now analyze how we can exploit the properties of the problems in order to parallelize the algorithm. The first important thing we notice is that in order to compute the updated values for the vector $x$ at iteration $k$, we need the full updated vector $x$ at iteration $k-1$, therefore the iterations of the algorithm needs to be strictly sequential. So let's focus on understanding what we can parallelize inside a single iteration. As we said in the description of the problem, at each iteration $k$ every component of the new vector $x^{(k+1)}$ can be computed independently from the others components using the formula in equation $\ref{eqn:iteration}$. So this is a data parallel computation where (for the reasons described before) we cannot modify the vector $x$ in place. So we can parallelize the code by assigning to each worker a different partition of components of $x$. \\
+	% Inside this map operation we have a sum of $n-1$ elements, which is the classical case of a reduce pattern. So inside each map we can call a reduce in the following way:
+	%\[
+	%map(reduce(+,nw_2), nw_1)
+	%\]
+	The usage of multiple workers introduces the following synchronization problems:
+	\begin{enumerate}
+		\item Start iteration $k+1$ only after all the workers finished their computations for iteration $k$, since as we said at the beginning of the analysis iterations must be strictly sequential 
+		\item Executing the swap of the main and auxiliary vectors only after all the workers finished their computations, otherwise it might happen that the vectors are swapped while other vectors have still to finish their computation
+		\item Keep track of the number of iteration so that all the workers will stop after $limit$ iterations. 
+	\end{enumerate}
+	The first problem can be solved simply by putting a barrier after the execution of the map, so that all the worker will be forced to wait the others before starting the next iteration. In this way we can also solve the third problem by selecting one of the worker to count the number of iterations of the algorithm executed so far. The designated worker can simply use a shared variable among the workers to increase by one at the end of every iteration, before the barrier (since the variable is modified by just one worker it doesn't need synchronization mechanism to be accessed). This solution guarantees that before starting iteration $k$ the shared variable will have value $k$ for all the workers, so every worker can individually check if $k = limit$ and stop its execution. The second problem can be solved simply by adding a second barrier, which will be placed between the end of the map and the next iteration barrier, and designate one of the worker to execute the swap of the vectors after the barrier (it can be the same worker which updates the iterations counter). In this way the swap will happen only after every worker finished its computations for the current iteration. 
+	
+	
+	\begin{algorithm}[H]
+		\caption{Worker pseudo-code}\label{alg:par}
+		\begin{algorithmic}[1]
+			\Require $A$ matrix, $b$ and $x$ vectors, $l$ positive integer
+			\While{$k < l$}
+			\For{$i \leftarrow start $ to $end$}
+			\State{$val \leftarrow 0$}
+			\For{$j \leftarrow 1 $ to $n$}
+			\If{$j \ne i$}
+			\State{$val \leftarrow val + A[i,j]* x[j]$}
+			\EndIf
+			\EndFor
+			\State{$x^\prime[i] \leftarrow \frac{1}{A[i,i]}(b[i]-val)$}
+			\EndFor
+			\State{\textbf{Vectors swap barrier}}
+			\If{start = 0}
+			\State{swap($x$, $x^\prime$)}
+			\State{$k \leftarrow k+1$}
+			\EndIf
+			\State{\textbf{Next iteration barrier}}
+			\EndWhile
+		\end{algorithmic}
+	\end{algorithm}
+	The variables $start$ and $end$ represent respectively the first and the last index of $x$ assigned to the worker to compute. Note that both of the barrier are needed, because if we only use the copy barrier, it might happen that one of the worker might start the next iteration before the designated worker could swap the vectors and update the iteration counter, so both barriers are needed. 
+	
+	\section{Time analysis}
+	The sequential algorithm requires:
+	$T_{seq} = lnn\cdot t_+$
+	
+	\section{Implementation}
+	The parallel program has bee implemented in three versions:
+	\begin{itemize}
+		\item The first using C++ threads 
+		\item The second using FastFlow
+		\item The third using Open MP
+	\end{itemize}
+	\subsection{C++ thread}
+	In this implementation we use the fork-join mechanism to spawn $nw$ threads, each of them is assign to a chunk of $x$ of size $\lfloor\frac{n}{nw}\rfloor$, and each of them execute code in $\ref{alg:par}$.
+	\subsection{FastFlow}
+	For the fast flow implementation we simply use the \verb|ParalleFor| class of FastFlow to parallelize the for loop which iterates over 
+	
+	\subsection{Open MP}
+	
+	
+	
+	\section{Experiments}
+	The goals of the experiments that we will execute are the following: 
+	\begin{itemize}
+		\item Comparing the performances obtained by the three implementations 
+		\item Check how the performances change with respect to the size of the matrix
+	\end{itemize}
+	To compare the performances of the three implementations we will compute the speedup obtained when executed with $nw$ workers, varying $nw$ from 1 to 128, and showing the results in a plot. To see if the size of the matrix impact on the speedup, we'll repeat the procedure for matrices of different sizes (100, 500, 1000). Note: in order to avoid good and bad case, to take the time obtain by one implementation with a certain number of worker, we execute the program 5 times and take the average time. \\
+	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (10, 20, 100, 200, 500, 1000, 2000, 5000, 10000) to better understand the impact that the size of the matrix has on the performances. Even in this case each time is the mean of five executions. 
+	\section{Manual}
+	To compile the code is sufficient to execute the command \verb*|make| in the \verb*|src| directory of the project. The compilation will produce the executable \verb*|main| which can be called to launch the program providing the following arguments:
+	\begin{itemize}
+		\item \textbf{n}: and integer which represent the number of row and columns of the matrix
+		\item \textbf{nw}: the number of workers that will be used in the parallel versions of the algorithm
+		\item \textbf{iterations}: the number of iterations of the algorithm
+	\end{itemize} 
+	Once execute the program will execute the sequential algorithm and the three parallel implementations and report the execution times in nanoseconds. For the experiment
 
 \end{document}

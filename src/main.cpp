@@ -1,6 +1,6 @@
 #include <iostream>
 #include "Jacobi.hpp"
-#include "timer.hpp"
+// #include "timer.hpp"
 
 int main(int argc, char *argv[]) {
     
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     real* x;
 
     {
-        timer t("seq");
+        // timer t("seq");
         x = prob.sequential(iters);
     }
 
@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     // std::cout << "\n";
 
     {
-        timer t("fff");
+        // timer t("fff");
         x = prob.parallel("ff", iters, nw);
     }
     // for (int i = 0; i < n; i++)
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
 
 
     {
-        timer t("par");
+        // timer t("par");
         x = prob.parallel("threads", iters, nw);
     }
     // for (int i = 0; i < n; i++)
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
 
     {
-        timer t("omp");
+        // timer t("omp");
         x = prob.parallel("omp", iters, nw);
     }
     // for (int i = 0; i < n; i++) {

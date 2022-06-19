@@ -1,4 +1,5 @@
 #include "Jacobi.hpp"
+#include "timer.hpp"
 #include <ctime>
 #include <vector>
 #include <functional>
@@ -33,22 +34,27 @@ real* Jacobi::sequential(int iterations) {
     srand(time(NULL));
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
     real* x_aux = new real[n]; 
-    real val;
     real* temp;
-    for (int k = 0; k < iterations; k++) {
-        for (int i = 0; i < n; i++) {
-            val = 0;
-            for (int j = 0; j < n; j++) {
-                val += (j != i ? A[i][j]*x[j] : 0);
+    
+    {
+        timer t("seq");
+        real val;
+        for (int k = 0; k < iterations; k++) {
+            for (int i = 0; i < n; i++) {
+                val = 0;
+                for (int j = 0; j < n; j++) {
+                    val += (j != i ? A[i][j]*x[j] : 0);
+                }
+                x_aux[i] = (1/A[i][i])/(b[i] - val);
             }
-            x_aux[i] = (1/A[i][i])/(b[i] - val);
+            temp = x_aux;
+            x_aux = x;
+            x = temp;
+            // for (int i = 0; i < n; i++)
+            //     x[i] = x_aux[i];
         }
-        temp = x_aux;
-        x_aux = x;
-        x = temp;
-        // for (int i = 0; i < n; i++)
-        //     x[i] = x_aux[i];
     }
+
     delete x_aux;
     return x;
 }
@@ -68,52 +74,58 @@ real* Jacobi::parallel(std::string mode, int iterations, int nw) {
 
 real* Jacobi::parallel_threads(int iterations, int nw) {
 
-    int k = 0;
     srand(time(NULL));
     real* x = new real[n];
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
     real* x_aux= new real[n]; 
     real* temp;
-    std::barrier copy_barrier(nw, []() { return; });
-    std::barrier next_iteration_barrier(nw, []() { return; });
-    std::thread tids[nw];
 
-    std::function<void(int, int)> thread_map_task = [&](int start, int end){
+    {
+        timer t("par");
+        int k = 0;
+        std::barrier copy_barrier(nw, []() { return; });
+        std::barrier next_iteration_barrier(nw, []() { return; });
+        std::thread tids[nw];
 
-        while (k < iterations) {
+        std::function<void(int, int)> thread_map_task = [&](int start, int end){
 
-            // do the first map calling the reduce operations
-            for (int i = start; i <= end; i++) {
-                real val = 0;
-                for (int j = 0; j < n; j++) {
-                    val += (j != i ? A[i][j]*x[j] : 0);
+            while (k < iterations) {
+
+                int i, j;
+                real val;
+                // do the first map calling the reduce operations
+                for (i = start; i <= end; i++) {
+                    val = 0;
+                    for (j = 0; j < n; j++) {
+                        val += (j != i ? A[i][j]*x[j] : 0);
+                    }
+                    x_aux[i] = (1/A[i][i])/(b[i] - val);
                 }
-                x_aux[i] = (1/A[i][i])/(b[i] - val);
+
+                copy_barrier.arrive_and_wait();
+
+                if (start == 0) {
+                    temp = x_aux;
+                    x_aux = x;
+                    x = temp;
+                    k+=1;
+                }
+
+                next_iteration_barrier.arrive_and_wait();
             }
 
-            copy_barrier.arrive_and_wait();
+        };
 
-            if (start == 0) {
-                temp = x_aux;
-                x_aux = x;
-                x = temp;
-                k+=1;
-            }
-
-            next_iteration_barrier.arrive_and_wait();
+        int size = n/nw;
+        for (int i = 0; i < nw; i++) {
+            int start = i*size;
+            int end = (i != nw-1 ? start + size - 1 : n-1);
+            tids[i] = std::thread(thread_map_task, start, end);
         }
 
-    };
-
-    int size = n/nw;
-    for (int i = 0; i < nw; i++) {
-        int start = i*size;
-        int end = (i != nw-1 ? start + size - 1 : n-1);
-        tids[i] = std::thread(thread_map_task, start, end);
-    }
-
-    for (int i = 0; i < nw; i++) {
-        tids[i].join();
+        for (int i = 0; i < nw; i++) {
+            tids[i].join();
+        }
     }
 
     delete x_aux;
@@ -124,29 +136,35 @@ real* Jacobi::parallel_threads(int iterations, int nw) {
 
 real* Jacobi::parallel_ff(int iterations, int nw) {
     
-    int k = 0;
     srand(time(NULL));
     real* x = new real[n];
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
     real* x_aux = new real[n]; 
     real* temp;
 
-    ParallelFor pf(nw);
-    int size = n/nw;
+    {
+        timer t("fff");
+        ParallelFor pf(nw);
+        int k = 0; 
+        int size = n/nw;
+        // real val;
+        int j;
 
-    while (k < iterations) {
-        pf.parallel_for(0, n, 1, size, [&](const long i) {
-            real val = 0; 
-            for (int j = 0; j < n; j++) {
-                val += (j != i ? A[i][j]*x[j] : 0);
-            }
-            x_aux[i] = (1/A[i][i])/(b[i] - val);
-        }, nw);
+        while (k < iterations) {
+            pf.parallel_for(0, n, 1, size, [&](const long i) {
+                real val = 0;
+                int j; 
+                for (j = 0; j < n; j++) {
+                    val += (j != i ? A[i][j]*x[j] : 0);
+                }
+                x_aux[i] = (1/A[i][i])/(b[i] - val);
+            }, nw);
 
-        temp = x_aux;
-        x_aux = x;
-        x = temp;
-        k++;
+            temp = x_aux;
+            x_aux = x;
+            x = temp;
+            k++;
+        }
     }
 
     delete x_aux;
@@ -160,21 +178,26 @@ real* Jacobi::parallel_omp(int iterations, int nw) {
     srand(time(NULL));
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
     real* x_aux = new real[n]; 
-    real val;
     real* temp;
-    for (int k = 0; k < iterations; k++) {
-        #pragma omp parallel for num_threads(nw)
-        for (int i = 0; i < n; i++) {
-            val = 0;
-            //#pragma omp parallel for reduction(+ : val) num_threads(nw1)
-            for (int j = 0; j < n; j++) {
-                val += (j != i ? A[i][j]*x[j] : 0);
+    int i, j, val;
+
+    {
+        timer t("omp");
+        real val;
+        for (int k = 0; k < iterations; k++) {
+            #pragma omp parallel for private(i, j, val) num_threads(nw)
+            for (i = 0; i < n; i++) {
+                val = 0;
+                //#pragma omp parallel for reduction(+ : val) num_threads(nw1)
+                for (j = 0; j < n; j++) {
+                    val += (j != i ? A[i][j]*x[j] : 0);
+                }
+                x_aux[i] = (1/A[i][i])/(b[i] - val);
             }
-            x_aux[i] = (1/A[i][i])/(b[i] - val);
+            temp = x_aux;
+            x_aux = x;
+            x = temp;
         }
-        temp = x_aux;
-        x_aux = x;
-        x = temp;
     }
     delete x_aux;
     return x;

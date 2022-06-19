@@ -1,28 +1,23 @@
-#!/bin/bash
-
-if [ $# -le 2 ] 
-then 
-    echo "Usage: ./experiments.sh n iters cores";
-    exit;
+if [ $# -le 1 ]
+then
+    echo "Usage: ./scaling.sh cores iterations";
 fi
 
-n=$1;
-iters=$2;
-n_cores=$3
+echo "n;seq_time;threads_time;ff_time;omp_time" > "scaling.csv";
 
-echo "n_cores;seq_time;threads_time;ff_time;omp_time" > "results.csv";
-for cores in $(seq $n_cores)
+for n in 10 20 50 100 500 1000 5000
 do
-    echo "$cores cores executed";
+    echo "$n x $n matrix executed";
     seq_avg=0;
     threads_avg=0;
     ff_avg=0;
     omp_avg=0;
-    for i in {1..1}
+    for i in {1..10}
     do
         # getting times
-        times=$(./main $n $cores $iters | cut -d " " -f2);
+        times=$(./main $n 4 1 | cut -d " " -f2);
         seq_time=$(echo $times | cut -d " " -f1);
+        echo $seq_time;
         threads_time=$(echo $times | cut -d " " -f2);
         ff_time=$(echo $times | cut -d " " -f3);
         omp_time=$(echo $times | cut -d " " -f4);
@@ -36,11 +31,7 @@ do
     threads_avg=$(echo $threads_avg/5 | bc -l);
     ff_avg=$(echo $ff_avg/5 | bc -l);
     omp_avg=$(echo $omp_avg/5 | bc -l);
-    
-    # getting speedup
-    # threads_sp=$(echo "$seq_avg / $threads_avg" | bc -l);
-    # ff_sp=$(echo "$seq_avg / $ff_avg" | bc -l);
-    # omp_sp=$(echo "$seq_avg / $omp_avg" | bc -l);
+    echo $seq_avg;
 
-    echo "$cores;$seq_avg;$threads_avg;$ff_avg;$omp_avg" >> "results.csv";
+    echo "$n;$seq_avg;$threads_avg;$ff_avg;$omp_avg" >> "scaling.csv";
 done
