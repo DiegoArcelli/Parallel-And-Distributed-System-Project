@@ -45,7 +45,7 @@ real* Jacobi::sequential(int iterations) {
                 for (int j = 0; j < n; j++) {
                     val += (j != i ? A[i][j]*x[j] : 0);
                 }
-                x_aux[i] = (1/A[i][i])/(b[i] - val);
+                x_aux[i] = (b[i] - val)/A[i][i];
             }
             temp = x_aux;
             x_aux = x;
@@ -99,7 +99,7 @@ real* Jacobi::parallel_threads(int iterations, int nw) {
                     for (j = 0; j < n; j++) {
                         val += (j != i ? A[i][j]*x[j] : 0);
                     }
-                    x_aux[i] = (1/A[i][i])/(b[i] - val);
+                    x_aux[i] = (b[i] - val)/A[i][i];
                 }
 
                 copy_barrier.arrive_and_wait();
@@ -157,7 +157,7 @@ real* Jacobi::parallel_ff(int iterations, int nw) {
                 for (j = 0; j < n; j++) {
                     val += (j != i ? A[i][j]*x[j] : 0);
                 }
-                x_aux[i] = (1/A[i][i])/(b[i] - val);
+                x_aux[i] = (b[i] - val)/A[i][i];
             }, nw);
 
             temp = x_aux;
@@ -192,7 +192,7 @@ real* Jacobi::parallel_omp(int iterations, int nw) {
                 for (j = 0; j < n; j++) {
                     val += (j != i ? A[i][j]*x[j] : 0);
                 }
-                x_aux[i] = (1/A[i][i])/(b[i] - val);
+                x_aux[i] = (b[i] - val)/A[i][i];
             }
             temp = x_aux;
             x_aux = x;

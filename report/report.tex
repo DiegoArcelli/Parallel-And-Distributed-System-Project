@@ -103,8 +103,11 @@
 	The variables $start$ and $end$ represent respectively the first and the last index of $x$ assigned to the worker to compute. Note that both of the barrier are needed, because if we only use the copy barrier, it might happen that one of the worker might start the next iteration before the designated worker could swap the vectors and update the iteration counter, so both barriers are needed. 
 	
 	\section{Time analysis}
-	The sequential algorithm requires:
-	$T_{seq} = lnn\cdot t_+$
+	In the sequential case as we said the complexity of the algorithm is:
+	\[ T_{seq} = T_{init} + k(n^2t_\oplus + t_{swap}) \]
+	as we already said the swap can be implemented just by swapping the pointer and the, so the time is approximately:
+	\[ T_{seq} \approx kn^2t_\oplus\]
+	
 	
 	\section{Implementation}
 	The parallel program has bee implemented in three versions:
@@ -129,7 +132,9 @@
 		\item Check how the performances change with respect to the size of the matrix
 	\end{itemize}
 	To compare the performances of the three implementations we will compute the speedup obtained when executed with $nw$ workers, varying $nw$ from 1 to 128, and showing the results in a plot. To see if the size of the matrix impact on the speedup, we'll repeat the procedure for matrices of different sizes (100, 500, 1000). Note: in order to avoid good and bad case, to take the time obtain by one implementation with a certain number of worker, we execute the program 5 times and take the average time. \\
-	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (10, 20, 100, 200, 500, 1000, 2000, 5000, 10000) to better understand the impact that the size of the matrix has on the performances. Even in this case each time is the mean of five executions. 
+	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (10, 20, 100, 200, 500, 1000, 2000, 5000, 10000) to better understand the impact that the size of the matrix has on the performances. Even in this case each time is the mean of five executions.
+	
+	
 	\section{Manual}
 	To compile the code is sufficient to execute the command \verb*|make| in the \verb*|src| directory of the project. The compilation will produce the executable \verb*|main| which can be called to launch the program providing the following arguments:
 	\begin{itemize}
