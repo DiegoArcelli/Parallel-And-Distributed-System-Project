@@ -1,4 +1,4 @@
-\documentclass[12pt]{article}
+\documentclass{article}
 \usepackage{graphicx}
 \usepackage[a4paper, left = 3.5cm, right = 3.5cm, top = 3.5cm, bottom = 3.5cm ]{geometry}
 \usepackage{listings}
@@ -32,16 +32,6 @@
 	
 	\tableofcontents
 	\newpage
-	
-	\section{Problem description}
-	The Jacobi method is an iterative algorithm which can be applied to solve systems of linear equations of the form $Ax = b$, where $A \in \mathbb{R}^{n\times n}$ is the coefficient matrix, $b \in \mathbb{R}^n$ is the constant terms vector and $x\in \mathbb{R}^n$ is the unknown vector that we want to compute. The algorithm compute iteratively $x$ as follows:
-	\[ x^{(k+1)} =  D^{-1}[b-(U+L)x^{(k)}] \]
-	where $x^{(k)}$ indicates the value of $x$ at the $k$-th iteration. Actually at each iteration $k$ we can compute independently every component $i$ of the vector using the equation:
-	\begin{equation}
-		\label{eqn:iteration}
-		x^{(k+1)}_i = \frac{1}{a_{i,i}}\Big(b_i - \sum_{j=1}^n a_{i,j}x^{(k)}_j\Big)
-	\end{equation}
-	where $x_i$ indicates the $i$-th component of vector $x$. Discussing further details of the algorithm is beyond the scope of this project.
 	
 	\section{Analysis of the problem}
 	The pseudo-code to execute the algorithm sequentially for a fixed amount of iteration $l$, is shown in \ref{alg:seq}. Note that at each iteration we're forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because if at iteration $k$, we compute $x^{(k)}_1$ modifying $x$ in-place, then when we compute $x^{(k+1)}_2$ instead of using $x^{(k)}_1$, we'll use $x^{(k+1)}_1$.\\ The algorithm is composed by three nested loops, where the first iterates $l$ times, and the other two iterate $n$ times, so the total time complexity is $O(ln^2)$. The swap function used in the pseudo-code to copy the elements of $x^\prime$ in $x$, can be implemented with $O(1)$ cost, by simply swapping the pointers of the two array (this works in C++ where we see as vectors).
@@ -102,12 +92,23 @@
 	\end{algorithm}
 	The variables $start$ and $end$ represent respectively the first and the last index of $x$ assigned to the worker to compute. Note that both of the barrier are needed, because if we only use the copy barrier, it might happen that one of the worker might start the next iteration before the designated worker could swap the vectors and update the iteration counter, so both barriers are needed. 
 	
+	
 	\section{Time analysis}
 	In the sequential case as we said the complexity of the algorithm is:
 	\[ T_{seq} = T_{init} + k(n^2t_\oplus + t_{swap}) \]
 	as we already said the swap can be implemented just by swapping the pointer and the, so the time is approximately:
 	\[ T_{seq} \approx kn^2t_\oplus\]
-	
+	In the parallel case in the second innermost loop, instead of iterating $n$ times, we will iterate $n/nw$ times. The overhead introduced is given by the forking and joining of the threads (which can be done just once) and by the time required by the synchronization with the two barriers. 
+	\[T_{par}(nw) = T_{init} + T_{fork} + k(\frac{n}{nw}nt_\oplus + T_{synch} + T_{swap} + T_{synch}) + T_{join} \]
+	So the speedup is:
+	\[ Speedup(nw) = \frac{T_{init} + k(n^2t_\oplus + t_{swap})}{T_{init} + T_{fork} + k(\frac{n}{nw}nt_\oplus + T_{synch} + T_{swap} + T_{synch}) + T_{join}}\]
+	If we consider negligible the time for the preparations of the data and the management of the workers then the speedup is more or less: 
+	\[ Speedup(nw) \approx \frac{kn^2t_\oplus}{k\frac{n}{nw}nt_\oplus} = nw\]
+	which is the ideal speedup which we can theoretically obtain with a map pattern. Of course to have a better estimate of the speedup we should consider the serial fraction of the program. We can make a rough estimate by considering that the total number of operations done by the algorithm is more or less in the order of $kn^2$, since we have to do some fixed amount of iterations inside the three loops. Ideally, with $n$ workers, every worker could compute its $x_i^{(k)}$, reducing the number of operation to $kn$, which are the number of operations that we have to do sequentially in the best case, so a rough estimation of the serial fraction $f$ is: 
+	\[ f = \frac{kn}{kn^2} = \frac{1}{n}\]
+	if we now consider the speedup given by the Ahamdal's law, we get that in the best case the maximum speedup is:
+	\[ Speedup < \frac{1}{f} = \frac{1}{\frac{1}{n}} = n\]
+	So the speedup is upper-bounded by the size of the matrix. This makes sense because in the best case we have a thread for each component $x_i$ of the vector, so at most $n$. So we should expect to have a better speedup as the size of $n$ increases. 
 	
 	\section{Implementation}
 	The parallel program has bee implemented in three versions:
@@ -142,6 +143,6 @@
 		\item \textbf{nw}: the number of workers that will be used in the parallel versions of the algorithm
 		\item \textbf{iterations}: the number of iterations of the algorithm
 	\end{itemize} 
-	Once execute the program will execute the sequential algorithm and the three parallel implementations and report the execution times in nanoseconds. For the experiment
+	Once execute the program will execute the sequential algorithm and the three parallel implementations and report the execution times in nanoseconds. The execution of the experiment is handled by two bash shell scripts.
 
 \end{document}

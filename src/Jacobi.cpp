@@ -188,7 +188,6 @@ real* Jacobi::parallel_omp(int iterations, int nw) {
             #pragma omp parallel for private(i, j, val) num_threads(nw)
             for (i = 0; i < n; i++) {
                 val = 0;
-                //#pragma omp parallel for reduction(+ : val) num_threads(nw1)
                 for (j = 0; j < n; j++) {
                     val += (j != i ? A[i][j]*x[j] : 0);
                 }
