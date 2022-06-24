@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import argparse
 
 
 def get_speedup(seq_times, par_times):
@@ -19,7 +20,7 @@ def get_scaling(par_times):
     return np.array([par_times[0]/par_times[i] for i in range(len(par_times))])
 
 
-def show_plot(x_label, y_label, title, n_cores, threads, ff, omp, seq=None):
+def show_plot(x_label, y_label, title, file_name, n_cores, threads, ff, omp, seq=None):
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.title(title)
@@ -29,8 +30,20 @@ def show_plot(x_label, y_label, title, n_cores, threads, ff, omp, seq=None):
     if seq is not None:
         plt.plot(n_cores, seq, label="Sequential", linestyle="dashdot", color="gray")
     plt.legend()
-    plt.show()
+    plt.savefig(f"./plots/{file_name}.png")
+    print(f"Saved: ./plots/{file_name}.png")
+    if show_flag:
+        plt.show()
+    plt.close()
 
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--show", "-s", action=argparse.BooleanOptionalAction)
+parser.add_argument("--output", "-o", type=str, default="experiment")
+args = parser.parse_args()
+args = vars(args)
+show_flag = args["show"]
+file_name = args["output"] 
 
 
 # plotting execution time
@@ -40,25 +53,24 @@ seq_times = data_cores["seq_time"].to_numpy()
 threads_times = data_cores["threads_time"].to_numpy()
 ff_times = data_cores["ff_time"].to_numpy()
 omp_times = data_cores["omp_time"].to_numpy()
-show_plot("Cores", "Time", "Time vs Cores", n_cores, threads_times, ff_times, omp_times, seq_times)
-
+show_plot("Cores", "Time", "Time vs Cores", f"time_vs_cores_{file_name}", n_cores, threads_times, ff_times, omp_times, seq_times)
 
 threads_sp = get_speedup(seq_times, threads_times)
 ff_sp = get_speedup(seq_times, ff_times)
 omp_sp = get_speedup(seq_times, omp_times)
-show_plot("Cores", "Speedup", "Speedup vs Cores", n_cores, threads_sp, ff_sp, omp_sp)
+if show_flag:
+    show_plot("Cores", "Speedup", "Speedup vs Cores", f"speedup_vs_cores_{file_name}", n_cores, threads_sp, ff_sp, omp_sp)
 
 
 threads_eff = get_efficiency(n_cores, seq_times, threads_times)
 ff_eff = get_efficiency(n_cores, seq_times, ff_times)
 omp_eff = get_efficiency(n_cores, seq_times, omp_times)
-show_plot("Cores", "Efficiency", "Efficiency vs Cores", n_cores, threads_eff, ff_eff, omp_eff)
+show_plot("Cores", "Efficiency", "Efficiency vs Cores", f"efficiency_vs_cores_{file_name}", n_cores, threads_eff, ff_eff, omp_eff)
 
 threads_scale = get_scaling(threads_times)
 ff_scale = get_scaling(ff_times)
 omp_scale = get_scaling(omp_times)
-show_plot("Cores", "Scaling", "Scaling vs Cores", n_cores, threads_scale, ff_scale, omp_scale)
-
+show_plot("Cores", "Scaling", "Scaling vs Cores", f"scaling_vs_cores_{file_name}", n_cores, threads_scale, ff_scale, omp_scale)
 
 data_scale = pd.read_csv("scaling.csv", sep=";")
 sizes = data_scale["n"].to_numpy()
@@ -66,11 +78,11 @@ seq_times = data_scale["seq_time"].to_numpy()
 threads_times = data_scale["threads_time"].to_numpy()
 ff_times = data_scale["ff_time"].to_numpy()
 omp_times = data_scale["omp_time"].to_numpy()
-show_plot("Size", "Time", "Time vs Size", sizes, threads_times, ff_times, omp_times, seq_times)
+show_plot("Size", "Time", "Time vs Size", f"time_vs_size_{file_name}", sizes, threads_times, ff_times, omp_times, seq_times)
 
 
 
 threads_sp = get_speedup(seq_times, threads_times)
 ff_sp = get_speedup(seq_times, ff_times)
 omp_sp = get_speedup(seq_times, omp_times)
-show_plot("Size", "Speedup", "Speedup vs Size", sizes, threads_sp, ff_sp, omp_sp)
+show_plot("Size", "Speedup", "Speedup vs Size", f"speedup_vs_size_{file_name}", sizes, threads_sp, ff_sp, omp_sp)

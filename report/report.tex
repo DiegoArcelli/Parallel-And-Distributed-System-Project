@@ -5,6 +5,7 @@
 \usepackage{amssymb}
 \usepackage{pgfplots} 
 \usepackage{amsmath}
+\usepackage{subfig}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{centernot}
@@ -134,7 +135,15 @@
 	\end{itemize}
 	To compare the performances of the three implementations we will compute the speedup obtained when executed with $nw$ workers, varying $nw$ from 1 to 128, and showing the results in a plot. To see if the size of the matrix impact on the speedup, we'll repeat the procedure for matrices of different sizes (100, 500, 1000). Note: in order to avoid good and bad case, to take the time obtain by one implementation with a certain number of worker, we execute the program 5 times and take the average time. \\
 	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (10, 20, 100, 200, 500, 1000, 2000, 5000, 10000) to better understand the impact that the size of the matrix has on the performances. Even in this case each time is the mean of five executions.
-	
+	\begin{figure}[H]
+		\centering
+		\subfloat[\centering label 1]{{\includegraphics[width=6.5cm]{./images/speedup_vs_cores_16384} }}%
+		\qquad
+		\subfloat[\centering label 2]{{\includegraphics[width=6.5cm]{./images/efficiency_vs_cores_16384} }}%
+		\caption{2 Figures side by side}%
+		\label{fig:example}%
+	\end{figure}
+		
 	
 	\section{Manual}
 	To compile the code is sufficient to execute the command \verb*|make| in the \verb*|src| directory of the project. The compilation will produce the executable \verb*|main| which can be called to launch the program providing the following arguments:
