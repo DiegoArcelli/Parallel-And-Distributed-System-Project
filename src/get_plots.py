@@ -78,8 +78,8 @@ seq_times = data_scale["seq_time"].to_numpy()
 threads_times = data_scale["threads_time"].to_numpy()
 ff_times = data_scale["ff_time"].to_numpy()
 omp_times = data_scale["omp_time"].to_numpy()
-show_plot("Size", "Time", "Time vs Size", f"time_vs_size_{file_name}", sizes, threads_times, ff_times, omp_times, seq_times)
-
+show_plot("Size", "Time", "Time vs Size", f"time_vs_size_{file_name}", sizes, threads_times, ff_times, omp_times)
+show_plot("Size", "Time difference (wrt sequential)", "Time difference vs Size", f"difference_vs_size_{file_name}", sizes, (seq_times - threads_times)/seq_times, (seq_times - ff_times)/seq_times, (seq_times - omp_times)/seq_times)
 
 
 threads_sp = get_speedup(seq_times, threads_times)

@@ -10,22 +10,13 @@
 #include <ff/parallel_for.hpp>
 #include <barrier>
 #include <omp.h>
-using namespace ff;
 
-#define DEBUG(i) (std::cout << "ZIOPERA" << i << "\n")
+using namespace ff;
 
 Jacobi::Jacobi(int n) {
     this->n = n;
-    A = new real*[n];
-    b = new real[n];
-    for (int i = 0; i < n; i++) {
-        A[i] = new real[n];
-        for (int j = 0; j < n; j++) {
-            A[i][j] = rand() % 10;
-        }
-        if (A[i][i] == 0) A[i][i] = (rand() % 9) + 1;
-        b[i] = rand() % 10;
-    }
+    A = generate_diagonal_dominant_matrix(n);
+    b = generate_random_vector(n);
 }
 
 
@@ -81,7 +72,7 @@ real* Jacobi::parallel_threads(int iterations, int nw) {
     real* temp;
 
     {
-        timer t("par");
+        timer t("cpp");
         int k = 0;
         std::barrier copy_barrier(nw, []() { return; });
         std::barrier next_iteration_barrier(nw, []() { return; });

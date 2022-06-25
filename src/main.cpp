@@ -28,19 +28,8 @@ int main(int argc, char *argv[]) {
 
     */
     int mode = atoi(argv[4]);
-    
-    real** A = new real*[n];
-    real* b = new real[n];
-    for (int i = 0; i < n; i++) {
-        A[i] = new real[n];
-        for (int j = 0; j < n; j++) {
-            A[i][j] = 10;//rand() % 10;
-        }
-        if (A[i][i] == 0) A[i][i] = (rand() % 9) + 1;
-        b[i] = 10;//rand() % 10;
-    }
 
-    Jacobi prob(n, A, b);
+    Jacobi prob(n);
 
     real* x;
 
