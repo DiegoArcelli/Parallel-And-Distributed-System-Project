@@ -34,40 +34,21 @@ int main(int argc, char *argv[]) {
     real* x;
 
     if (mode < 2) {
-        // timer t("seq");
         x = prob.sequential(iters);
     }
 
-    // for (int i = 0; i < n; i++)
-    //     std::cout << x[i] << " ";
-    // std::cout << "\n";
-
-    // for (int i = 0; i < n; i++)
-    //     std::cout << x[i] << " ";
-    // std::cout << "\n";
-
-
     if (mode == 0 || mode == 2 || mode == 3) {
-        // timer t("par");
         x = prob.parallel("threads", iters, nw);
     }
-    // for (int i = 0; i < n; i++)
-    //     std::cout << x[i] << " ";
-    // std::cout << "\n";
+
     if (mode == 0 || mode == 2 || mode == 4) {
-        // timer t("fff");
         x = prob.parallel("ff", iters, nw);
     }
 
 
     if (mode == 0 || mode == 2 || mode == 5) {
-        // timer t("omp");
         x = prob.parallel("omp", iters, nw);
     }
-    // for (int i = 0; i < n; i++) {
-    //     std::cout << x[i] << " ";
-    // }
-    // std::cout << "\n";
 
 
 
