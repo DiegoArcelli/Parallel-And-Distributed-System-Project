@@ -68,11 +68,12 @@ real* Jacobi::parallel_threads(int iterations, int nw) {
     srand(time(NULL));
     real* x = new real[n];
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
-    real* x_aux= new real[n]; 
-    real* temp;
+    
 
     {
         timer t("cpp");
+        real* x_aux= new real[n]; 
+        real* temp;
         int k = 0;
         std::barrier copy_barrier(nw, []() { return; });
         std::barrier next_iteration_barrier(nw, []() { return; });
@@ -117,9 +118,11 @@ real* Jacobi::parallel_threads(int iterations, int nw) {
         for (int i = 0; i < nw; i++) {
             tids[i].join();
         }
+
+        delete x_aux;
     }
 
-    delete x_aux;
+    
 
     return x;
 
@@ -129,12 +132,13 @@ real* Jacobi::parallel_ff(int iterations, int nw) {
     
     srand(time(NULL));
     real* x = new real[n];
-    for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
-    real* x_aux = new real[n]; 
-    real* temp;
 
     {
         timer t("fff");
+
+        for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
+        real* x_aux = new real[n]; 
+        real* temp;
         ParallelFor pf(nw);
         int k = 0; 
         int size = n/nw;
@@ -156,9 +160,9 @@ real* Jacobi::parallel_ff(int iterations, int nw) {
             x = temp;
             k++;
         }
+        delete x_aux;
     }
 
-    delete x_aux;
     return x;
 
 }
@@ -166,14 +170,13 @@ real* Jacobi::parallel_ff(int iterations, int nw) {
 real* Jacobi::parallel_omp(int iterations, int nw) {
 
     real* x = new real[n];
-    srand(time(NULL));
-    for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
-    real* x_aux = new real[n]; 
-    real* temp;
-    int i, j, val;
+    for (int i = 0; i < n; i++) x[i] = 0;
 
     {
         timer t("omp");
+        real* x_aux = new real[n]; 
+        real* temp;
+        int i, j;
         real val;
         for (int k = 0; k < iterations; k++) {
             #pragma omp parallel for private(i, j, val) num_threads(nw)
@@ -188,8 +191,8 @@ real* Jacobi::parallel_omp(int iterations, int nw) {
             x_aux = x;
             x = temp;
         }
+        delete x_aux;
     }
-    delete x_aux;
     return x;
 
 }

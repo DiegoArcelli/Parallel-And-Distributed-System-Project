@@ -48,8 +48,8 @@ For example if we run the command:
 ```
 ./get_scaling.sh 16 100
 ```
-The script will run all the implementations using 16 cores, fo 100 iterations, first on a $10\times10$ matrix, then on a $100\times100$, then on a $500\times500$ matrix, and so on. The results of the experiments are by default written in a file called `results_scaling.csv`.
+The script will run all the implementations using 16 cores, fo 100 iterations, first on a 10 $\times$ 10 matrix, then on a 100 $\times$ 100, then on a 500 $\times$ 500 matrix, and so on. The results of the experiments are by default written in a file called `results_scaling.csv`.
 
 To get the plots of execution times, speedup and effeciency, you can run the python script `get_plots.py`, which requires two arguments:
 - `--show` or `-s` to show the plots on the screen
-- `--output` or `-o` to set the common prefix of the file names of the plots
+- `--output` or `-o` to set the common suffix of the file names of the plots
