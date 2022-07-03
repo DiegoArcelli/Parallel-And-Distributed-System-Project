@@ -1,4 +1,3 @@
-from fileinput import filename
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -27,11 +26,12 @@ def show_plot(x_label, y_label, title, file_name, n_cores, threads, ff, omp, seq
     # plt.title(title, fontsize=25)
     plt.xticks(fontsize=30)
     plt.yticks(fontsize=30)
-    plt.plot(n_cores, threads, label="C++ threads", linestyle="solid", color="grey", linewidth=3)
-    plt.plot(n_cores, ff, label="Fast Flow", linestyle='dashed', color="gray", linewidth=3)
-    plt.plot(n_cores, omp, label="Open MP", linestyle='dotted', color="gray", linewidth=3)
+    width = 3
+    plt.plot(n_cores, threads, label="C++ threads", linestyle="solid", color="#c1c0be", linewidth=width)
+    plt.plot(n_cores, ff, label="Fast Flow", linestyle='dashed', color="#82817d", linewidth=width)
+    plt.plot(n_cores, omp, label="Open MP", linestyle='dotted', color="#000000", linewidth=width)
     if seq is not None:
-        plt.plot(n_cores, seq, label="Sequential", linestyle="dashdot", color="gray", linewidth=3)
+        plt.plot(n_cores, seq, label="Sequential", linestyle="dashdot", color="gray", linewidth=width)
     plt.legend(fontsize=30)
     plt.savefig(f"./plots/{file_name}.png", dpi=100, bbox_inches='tight')
     print(f"Saved: ./plots/{file_name}.png")
@@ -47,7 +47,8 @@ args = parser.parse_args()
 args = vars(args)
 show_flag = args["show"]
 file_name = args["output"] 
-plt.rcParams["figure.figsize"] = (20,15)
+# plt.rcParams["figure.figsize"] = (20,15)
+plt.rcParams["figure.figsize"] = (20,10)
 
 
 

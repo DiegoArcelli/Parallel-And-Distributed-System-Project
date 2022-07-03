@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
 
     Jacobi prob(n);
 
-    real* x;
+    double* x;
 
     if (mode < 2) {
         x = prob.sequential(iters);
