@@ -69,7 +69,7 @@
 		\item Keep track of the number of iterations so that all the workers will stop after $limit$ iterations
 	\end{enumerate}
 	The first problem can be solved simply by putting a barrier after the execution of the map, so that all the worker will be forced to wait the others before starting the next iteration. In this way we can also solve the third problem by selecting one of the worker to count the number of iterations of the algorithm executed so far. The designated worker can simply use a shared variable among the workers, that it will increase by one before the barrier. Since the variable is modified by just one worker it doesn't need synchronization mechanism to be accessed even if it is shared. This solution guarantees that before starting iteration $k$ the shared variable will have value $k$ for all the workers, so that every worker can individually check if $k = limit$ and stop its execution if it is the case. To solve the second problem we need to introduce a second barrier, which has to be placed between the end of the map an the previously defined next iteration barrier. Between this new defined barrier and the next iteration barrier, one of the workers will be selected to execute the swap (it can be the same one that counts the iterations). In this way the swap will happen only after every worker finished its computations for the current iteration and before starting the next iteration.\\
-	The pseudo-code of the operations executed by a worker is showed in \ref{alg:par}.
+	The pseudo-code of the routine executed by a worker is showed in \ref{alg:par}.
 	\begin{algorithm}[H]
 		\caption{Worker pseudo-code}\label{alg:par}
 		\begin{algorithmic}[1]
@@ -223,7 +223,7 @@
 	\begin{figure}[H]
 		\centering
 		\includegraphics[width=13cm]{./images/data_types_speedup}
-		\caption{Speedup vs workers for different types}
+		\caption{Data types comparison}
 	\end{figure}
 
 
