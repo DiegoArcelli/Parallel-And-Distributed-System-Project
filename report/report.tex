@@ -44,15 +44,15 @@
 		\caption{Sequential code for Jacobi method}\label{alg:seq}
 		\begin{algorithmic}[1]
 			\Require $A$ strictly diagonal dominant matrix, $b$ vector, $limit$ positive integer
-			\For{$k \leftarrow 1$ to $limit$}
-			\For{$i \leftarrow 1 $ to $n$}
-			\State{$val \leftarrow 0$}
-			\For{$j \leftarrow 1 $ to $n$}
+			\For{$k \gets 1$ to $limit$}
+			\For{$i \gets 1 $ to $n$}
+			\State{$val \gets 0$}
+			\For{$j \gets 1 $ to $n$}
 			\If{$j \ne i$}
-			\State{$val \leftarrow val + A[i,j]* x[j]$}
+			\State{$val \gets val + A[i,j]* x[j]$}
 			\EndIf
 			\EndFor
-			\State{$x^\prime[i] \leftarrow \frac{1}{A[i,i]}(b[i]-val)$}
+			\State{$x^\prime[i] \gets \frac{1}{A[i,i]}(b[i]-val)$}
 			\EndFor
 			\State{swap($x$, $x^\prime$)}
 			\EndFor
@@ -75,19 +75,19 @@
 		\begin{algorithmic}[1]
 			\Require $A$ strictly diagonal dominant matrix, $b$ vector, $limit$ positive integer
 			\While{$k < limit$}
-			\For{$i \leftarrow start $ to $end$}
-			\State{$val \leftarrow 0$}
-			\For{$j \leftarrow 1 $ to $n$}
+			\For{$i \gets start $ to $end$}
+			\State{$val \gets 0$}
+			\For{$j \gets 1 $ to $n$}
 			\If{$j \ne i$}
-			\State{$val \leftarrow val + A[i,j]* x[j]$}
+			\State{$val \gets val + A[i,j]* x[j]$}
 			\EndIf
 			\EndFor
-			\State{$x^\prime[i] \leftarrow \frac{1}{A[i,i]}(b[i]-val)$}
+			\State{$x^\prime[i] \gets \frac{1}{A[i,i]}(b[i]-val)$}
 			\EndFor
 			\State{\textbf{Vectors swap barrier}}
 			\If{start = 0}
 			\State{swap($x$, $x^\prime$)}
-			\State{$k \leftarrow k+1$}
+			\State{$k \gets k+1$}
 			\EndIf
 			\State{\textbf{Next iteration barrier}}
 			\EndWhile
@@ -99,25 +99,24 @@
 	\section{Time analysis}
 	In the sequential case, the time required to execute the algorithm is:
 	\[ T_{seq} = T_{init} + k\Big(n^2T_\oplus + T_{swap}\Big) \]
-	where $k$ is the number of iterations, $n$ is the number of row and columns of the matrix, $T_{init}$ is the time required to initialize the computations, $T_\oplus$ is the time required to compute the expression at line 6 of \ref{alg:seq} and $T_{swap}$ is the time required to perform the swap of the vectors. $T_{init}$ includes the declaration of some variable and the creation of the auxiliary array, an operation whose cost depends by $n$. If we consider negligible everything that it outside the main loop and the swap time, then the execution time is more or less: 
+	where $k$ is the number of iterations, $n$ is the number of rows and columns of the matrix, $T_{init}$ is the time required to initialize the computations, $T_\oplus$ is the time required to compute the expression at line 6 of \ref{alg:seq} and $T_{swap}$ is the time required to perform the swap of the vectors. $T_{init}$ includes the declaration of some variable and the creation of the auxiliary array, an operation whose cost depends by $n$. If we consider negligible the initialization and the swap times, then the execution time is more or less: 
 	\[ T_{seq} \approx kn^2T_\oplus \]
-	In the parallel case, the loop at line 2 of \ref{alg:seq} is parallelized, so, with $nw$ workers available, the program will execute at the same time $nw$ parallel loops, each of which will iterate more or less $\frac{n}{nw}$ times. The overhead introduced is given by the forking and joining of the threads, by the time required to compute and assign tasks to the workers and by the time required to manage the barrier.
+	In the parallel case, the loop at line 2 of \ref{alg:seq} is parallelized, so, with $nw$ workers available, the program will execute at the same time $nw$ parallel loops, each of which will iterate more or less $\frac{n}{nw}$ times. The overhead introduced is given by the forking and joining of the threads, by the time required to compute and assign tasks to the workers and by the time required to manage the barrier, so overall we have that the parallel time is:
 	\[T_{par}(nw) = T_{init} + T_{split} + T_{fork} + k\Big(\frac{n}{nw}nT_\oplus + T_{synch} + T_{swap} + T_{synch}\Big) + T_{join} \]
-	where $T_{fork}$ and $T_{join}$ are the times for the fork-join mechanism, $T_{split}$ is the time required to compute and split the tasks among the workers and $T_{synch}$ is the time required to handle the barrier. Again, if we consider negligible everything that is not :
+	where $T_{fork}$ and $T_{join}$ are the times for the fork-join mechanism, $T_{split}$ is the time required to compute and split the tasks among the workers and $T_{synch}$ is the time required to handle the barrier. Again, if we consider negligible the times required for the preparations, the synchronization and the swap, then the parallel time is approximately:
 	\[T_{par}(n) \approx k\frac{n}{nw}nT_\oplus \]
-	If we had decided to implement the reduce too, assigning $nw_1$ workers to the map and $nw_2$ workers to each worker of the map for the reduce, then then the parallel time would have changed as follows:
-	\[ T_{par}(nw) \approx k\Big[\frac{n}{nw_1}\Big(\frac{n}{nw_2}T_\oplus + nw_2T_\oplus \Big) \Big] = k\Big(\frac{n}{nw_1}\frac{n}{nw_2}T_\oplus\Big) + k\Big(nw_2T_\oplus\Big) \approx k\Big(\frac{n}{nw_1}\frac{n}{nw_2}T_\oplus\Big)\]
-	since we could have computed in parallel $nw_2$ partial sums of $\frac{n}{nw_2}$ elements each, and then we would have computed the final sum summing up the $nw_2$ partial sums. As you can see if in the formula with only the map, if we set $nw = nw_1*nw_2$ we would have obtained the same speedup.\\
-	So the speedup is:
-	\[ Speedup(nw) = \frac{T_{init} + k\Big(n^2T_\oplus + T_{swap}\Big)}{T_{init} + T_{split} + T_{fork} + k\Big(\frac{n}{nw}nT_\oplus + T_{synch} + T_{swap} + T_{synch}\Big) + T_{join}}\]parallel
-	If we consider negligible everything that happen outside the main loop of the program, then the speedup is:
+	If we had decided to implement the reduce too, assigning $nw_1$ workers to the map and $nw_2$ workers to each worker of the map for the reduce, then the parallel time would have changed as follows:
+	\[ T^\prime_{par}(nw) \approx k\Big[\frac{n}{nw_1}\Big(\frac{n}{nw_2}T_\oplus + nw_2T_\oplus \Big) \Big] = k\frac{n}{nw_1}\frac{n}{nw_2}T_\oplus + knw_2T_\oplus \approx k\frac{n}{nw_1}\frac{n}{nw_2}T_\oplus \]
+	since for each map we could have computed in parallel $nw_2$ partial sums of $\frac{n}{nw_2}$ elements each, and then we would have computed the final sum summing up the $nw_2$ partial sums. If in $T_{par}$ we set $nw = nw_1\cdot nw_2$, then the time is the same of $T^\prime_{par}$. Actually if we don't exclude from $T^\prime_{par}$ the time needed to compute the partial sums, we also have the term $k nw_2T_\oplus$, and so $T_{par}$ is even better than $T^\prime_{par}$. From this analysis we draw the conclusion that if we only implement the map, with the same resources we get an even better theoretical execution time than implementing both the map and the reduce. Furthermore the implementations of the reduce would introduce overheads and more synchronization problems that are not present if we only implement the map.\\
+	The speedup we can achieve is:
+	\[ Speedup(nw) = \frac{T_{init} + k\Big(n^2T_\oplus + T_{swap}\Big)}{T_{init} + T_{split} + T_{fork} + k\Big(\frac{n}{nw}nT_\oplus + T_{synch} + T_{swap} + T_{synch}\Big) + T_{join}}\]
+	If we exclude the negligible times then we get:
 	\[ Speedup(nw) \approx \frac{kn^2t_\oplus}{k\frac{n}{nw}nt_\oplus} = nw\]
-	which is the ideal speedup which we can theoretically obtain with a map pattern. Of course to have a better estimate of the speedup we should consider the serial fraction of the program. We can make a rough estimation by considering that the total number of operations done by the algorithm is more or less in the order of $kn^2$, since we have to do some fixed amount of operations inside the three loops. Ideally, with $n$ workers, every worker could compute its own $x_i^{(k)}$ in more or less $n$ operations, reducing the number of operations to $kn$, which are the op so a rough estimation of the serial fraction $f$ is: 
+	which is the ideal speedup which we can theoretically obtain with a map pattern. Of course to have a better estimate of the speedup we should consider the serial fraction of the program. We can make a rough estimation by considering that the total number of operations done by the algorithm is more or less in the order of $kn^2$. since we have to do some fixed amount of operations inside the three loops. Ideally, With $n$ workers, every worker could compute its own $x_i^{(k)}$ in more or less $n$ operations, reducing the number of operations to $kn$. Therefore a rough estimation of the serial fraction is:
 	\[ f = \frac{kn}{kn^2} = \frac{1}{n}\]
 	if we now consider the speedup given by the Amdahl's law, we have that in the best case the maximum speedup is:
 	\[ Speedup < \frac{1}{f} = \frac{1}{\frac{1}{n}} = n\]
 	So the speedup is upper-bounded by the number of rows/columns of the matrix. This makes sense, since in an ideal scenario, we would have a worker for each component of the vector $x$, reducing the cost of a single iteration of the algorithm from $O(n^2)$ to $O(n)$. So we should expect a better speedup as $n$ increases. 
-	
 	
 	\section{Implementation details}
 	The parallel program has been implemented in three versions:
@@ -126,12 +125,33 @@
 		\item[--] The second using FastFlow
 		\item[--] The third using OpenMP
 	\end{itemize}
-	The program has been implemented defining a class called \verb|Jacobi| which has as attributes the coefficients matrix $A$, the vector of known terms $b$ and an integer $n$ which is the size of $A$ and $b$. For each implementation of the algorithm (the sequential and the three parallel ones) there's a corresponding method to solve the linear system $Ax = b$, using that specific implementation, by providing as parameters the number of iterations of the algorithm and the number of workers (for the parallel versions).
+	The program has been implemented defining a class called \verb|Jacobi| which has as attributes the coefficients matrix $A$, the vector of known terms $b$ and an integer $n$ that is the size of $A$ and $b$. For each implementation of the algorithm (the sequential and the three parallel ones) there's a corresponding method to solve the linear system $Ax = b$, using that specific implementation, by providing as parameters the number of iterations of the algorithm and the number of workers (for the parallel versions). For all the implementations the solution vector $x$ is initialized setting all the elements to 0, and to assure that algorithm will converge, $A$ it's generated randomly to be strictly diagonal dominant. 
 	
 	\subsection{C++ threads}
-	In the implementation with C++ threads we use the fork-join mechanism to spawn $nw$ threads, each of them is assign to a contiguous chunk of $x$ of size $\lfloor\frac{n}{nw}\rfloor$, and it executes code which is basically identical to the one in $\ref{alg:par}$. For the barrier I used the \verb*|barrier| class introduced in C++20.
+	In the implementation with C++ threads I used the fork-join mechanism to spawn $nw$ threads, each of them is assigned to a contiguous chunk of $x$ of size $\lfloor\frac{n}{nw}\rfloor$ according to the following procedure:
+	\begin{algorithmic}
+		\State $\Delta \gets \lfloor\frac{n}{nw}\rfloor$
+		\For{$i \gets 0$ to  $nw$}
+			\State $start_i \gets i*\Delta$
+			\State $end_i \gets start_i + \Delta - 1$
+		\EndFor
+		\State $end_{nw} \gets n-1$
+	\end{algorithmic}
+	Then each thread will execute code identical to the one in \ref{alg:par}. For the implementation of the barrier I used the \verb*|barrier| class introduced in C++20.
 	\subsection{FastFlow}
-	For the FastFlow implementation I uses the \verb|ParalleFor| class to parallelize the loop at line 2 of \ref{alg:seq}. We create an object of class \verb|ParalleFor| before the loops start, in order to prepare the $nw$ workers, and then we call the \verb*|parallel_for| method, inside the main loop of the main loop of the algorithm. After the call of the parallel for method, the counter of the loop is increased and the vectors are swapped, and this is done sequentially by the main thread of the program. Note that we do not need to explicitly define the barrier since the call of the \verb*|parallel_for| method is an implicit barrier for the thread. 
+	For the FastFlow implementation I used the \verb|ParalleFor| class to parallelize the loop at line 2 of \ref{alg:seq}. An object of class \verb|ParalleFor| is created before the loops start, in order to prepare the $nw$ workers in advance, and then we call the \verb*|parallel_for| method, inside the main loop of of the algorithm. The function passed to the parallel:
+	\begin{algorithmic}
+		\Function{parallel\_for\_iteration}{$i$}
+		\State $val \gets 0$
+		\For{$j \gets 0$ to  $n-1$}
+		\If{$i \ne j$}
+		\State $val \gets val + A[i,j]$
+		\EndIf
+		\EndFor
+		\State $x^\prime[i] = (b[i]-val)/A[i,i]$
+		\EndFunction
+	\end{algorithmic}
+	After the call of the parallel for method, the counter of the loop is increased and the vectors are swapped, and this is done sequentially by the main thread of the program. Note that we do not need to explicitly define the barrier since the call of the \verb*|parallel_for| method is an implicit barrier for the workers. 
 	\subsection{OpenMP}
 	For the OpenMP implementation I simply parallelized the second innermost loop at line 2 of algorithm \ref{alg:seq}, using the \verb|#pragama omp paralle for| directive, with the default static scheduling, which divides the loop in $nw$ chunks of equal size. Like in the case of FastFlow, the end of the parallelized for is an implicit barrier for the threads used in the parallel for, so we do not need to define the barrier explicitly.  
 	\section{Manual}
@@ -153,44 +173,10 @@
 		\item[--] Comparing the actual performances to the ideal ones
 	\end{itemize}
 	To compare the performances of the three implementations we'll measure the times obtained when executing the algorithm with $nw$ workers, varying $nw$ from 1 to 128. Then from the times we'll derive the speedup and the efficiency of the three implementations. To see if the size of the matrix impact on the performances, we'll repeat this procedure twice, first on 1000$\times$1000 matrix and then on a 1000$\times$1000 matrix.\\
-	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (500, 1000, 5000, 10000, 15000, 20000) to better understand the impact that the size of the matrix has on the performances. The results of the experiments are shown in the following plots.
-	\iffalse
-	\begin{figure}[H]
-		\centering
-		\subfloat[\centering Matrix size 1000]{{\includegraphics[width=7.5cm]{./images/time_vs_cores_1000} }}%
-		\qquad
-		\subfloat[\centering Matrix size 10000]{{\includegraphics[width=7.5cm]{./images/time_vs_cores_10000} }}%
-		\caption{Execution times vs number of workers}%
-		\label{fig:time}%
-	\end{figure}
-	
-	\begin{figure}[H]
-		\centering
-		\subfloat[\centering Matrix size 1000]{{\includegraphics[width=7.5cm]{./images/speedup_vs_cores_1000} }}%
-		\qquad
-		\subfloat[\centering Matrix size 10000]{{\includegraphics[width=7.5cm]{./images/speedup_vs_cores_10000} }}%
-		\caption{Speedup vs number of workers}%
-		\label{fig:speedup}%
-	\end{figure}
-	
-	
-	\begin{figure}[H]
-		\centering
-		\subfloat[\centering Matrix size 1000]{{\includegraphics[width=7.5cm]{./images/efficiency_vs_cores_1000} }}%
-		\qquad
-		\subfloat[\centering Matrix size 10000]{{\includegraphics[width=7.5cm]{./images/efficiency_vs_cores_10000} }}%
-		\caption{Efficiency vs number of workers}%
-		\label{fig:eff}%
-	\end{figure}
-
-	\begin{figure}[H]
-		\centering
-		\includegraphics[width=7.5cm]{./images/speedup_vs_size}
-		\caption{Speedup vs matrix size}
-		\label{fig:scaling}
-	\end{figure}
-	\fi
-	
+	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (500, 1000, 5000, 10000, 15000, 20000) to better understand the impact that the size of the matrix has on the performances.\\
+	Another interesting fact that I encountered during the experiments and I think it's worth mentioning, is  that the data type of the elements of the matrix has a significant impact on the achieved speedup of the parallel implementations. Using \verb|floats| data type yields to better speedups than using \verb|double| or \verb|long double|. Because of this I also inserted a plot that shows the different speedup achieved by the FastFlow implementation for the three C++ floating point data type \verb|float|, \verb|double| and \verb|long double|. \\
+	To get the times I created a \verb|timer| class which uses the RAII mechanism to print the difference between the time in which it's created and the time in which it's destructed, as we saw during the lectures. In the execution time are included the declaration of some variable and the allocation and deallocation of the auxiliary array in the main memory, but not the initialization of vector $x$.\\
+	The results of the experiments are shown in the below plots:
 	
 	\begin{figure}[H]
 		\centering
@@ -232,6 +218,12 @@
 		\centering
 		\includegraphics[width=13cm]{./images/speedup_vs_size}
 		\caption{Speedup vs matrix size with 32 workers}
+	\end{figure}
+
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=13cm]{./images/data_types_speedup}
+		\caption{Speedup vs workers for different types}
 	\end{figure}
 
 
