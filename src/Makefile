@@ -16,7 +16,7 @@ Jacobi.o: Jacobi.cpp Jacobi.hpp utils.hpp
 	$(COMP) -c Jacobi.cpp $(FLAGS)
 
 timer.o: timer.cpp timer.hpp
-	$(COMP) -c timer.cpp
+	$(COMP) -c timer.cpp $(FLAGS)
 
 clean:
 	@rm *.o

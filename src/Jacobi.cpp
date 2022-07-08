@@ -20,37 +20,37 @@ Jacobi::Jacobi(int n) {
 }
 
 
-real* Jacobi::sequential(int iterations) {
-    real* x = new real[n];
-    srand(time(NULL));
-    for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
-    real* x_aux = new real[n]; 
-    real* temp;
+double* Jacobi::sequential(int iterations) {
+    double* x = new double[n];
+    for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10; 
     
     {
         timer t("seq");
-        real val;
+        double* x_aux = new double[n];
+        double* temp;
         for (int k = 0; k < iterations; k++) {
             for (int i = 0; i < n; i++) {
-                val = 0;
+                x_aux[i] = 0;
                 for (int j = 0; j < n; j++) {
-                    val += (j != i ? A[i][j]*x[j] : 0);
+                    if (i != j) {
+                        x_aux[i] -= A[i][j]*x[j];
+                    }
                 }
-                x_aux[i] = (b[i] - val)/A[i][i];
+                x_aux[i] = (x_aux[i] + b[i])/A[i][i];
             }
             temp = x_aux;
             x_aux = x;
             x = temp;
         }
+        delete x_aux;
     }
 
-    delete x_aux;
     return x;
 }
 
-real* Jacobi::parallel(std::string mode, int iterations, int nw) {
+double* Jacobi::parallel(std::string mode, int iterations, int nw) {
     
-    if (mode == "threads") {
+    if (mode == "cpp") {
         return this->parallel_threads(iterations, nw);
     } else if (mode == "ff") { 
         return this->parallel_ff(iterations, nw);
@@ -61,16 +61,16 @@ real* Jacobi::parallel(std::string mode, int iterations, int nw) {
     return nullptr;
 }
 
-real* Jacobi::parallel_threads(int iterations, int nw) {
+double* Jacobi::parallel_threads(int iterations, int nw) {
 
-    real* x = new real[n];
+    double* x = new double[n];
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
     
 
     {
         timer t("cpp");
-        real* x_aux= new real[n]; 
-        real* temp;
+        double* x_aux= new double[n]; 
+        double* temp;
         int k = 0;
         int start, end;
         std::barrier copy_barrier(nw, []() { return; });
@@ -79,17 +79,17 @@ real* Jacobi::parallel_threads(int iterations, int nw) {
 
         std::function<void(int, int)> thread_map_task = [&](int start, int end){
 
-            real val;
             int i, j;
             while (k < iterations) {
 
-                val = 0;
                 for (i = start; i <= end; i++) {
-                    val = 0;
-                    for (j = 0; j < n; j++) {
-                        val += (j != i ? A[i][j]*x[j] : 0);
+                    x_aux[i] = 0;
+                    for (int j = 0; j < n; j++) {
+                        if (i != j) {
+                            x_aux[i] -= A[i][j]*x[j];
+                        }
                     }
-                    x_aux[i] = (b[i] - val)/A[i][i];
+                    x_aux[i] = (x_aux[i] + b[i])/A[i][i];
                 }
 
                 copy_barrier.arrive_and_wait();
@@ -116,46 +116,43 @@ real* Jacobi::parallel_threads(int iterations, int nw) {
         for (int i = 0; i < nw; i++) {
             tids[i].join();
         }
-
         delete x_aux;
     }
-
-    
 
     return x;
 
 }
 
-real* Jacobi::parallel_ff(int iterations, int nw) {
+double* Jacobi::parallel_ff(int iterations, int nw) {
     
-    real* x = new real[n];
+    double* x = new double[n];
     for (int i = 0; i < n; i++) x[i] = 0;// rand() % 10;
 
     {
         timer t("fff");
-
-        real* x_aux = new real[n]; 
-        real* temp;
+        double* x_aux = new double[n]; 
+        double* temp;
         ParallelFor pf(nw);
-        int k = 0; 
         int size = n/nw;
-        // real val;
+        int k = 0;
         int j;
 
         while (k < iterations) {
             pf.parallel_for(0, n, 1, size, [&](const long i) {
-                real val = 0;
-                int j; 
-                for (j = 0; j < n; j++) {
-                    val += (j != i ? A[i][j]*x[j] : 0);
+                x_aux[i] = 0;
+                for (int j = 0; j < n; j++) {
+                    if (i != j) {
+                        x_aux[i] -= A[i][j]*x[j];
+                    }
                 }
-                x_aux[i] = (b[i] - val)/A[i][i];
+                x_aux[i] = (x_aux[i] + b[i])/A[i][i];
             }, nw);
-
+                
             temp = x_aux;
             x_aux = x;
             x = temp;
-            k++;
+            k+=1;
+
         }
         delete x_aux;
     }
@@ -164,30 +161,34 @@ real* Jacobi::parallel_ff(int iterations, int nw) {
 
 }
 
-real* Jacobi::parallel_omp(int iterations, int nw) {
+double* Jacobi::parallel_omp(int iterations, int nw) {
 
-    real* x = new real[n];
+    double* x = new double[n];
     for (int i = 0; i < n; i++) x[i] = 0;
 
     {
         timer t("omp");
-        real* x_aux = new real[n]; 
-        real* temp;
+        double* x_aux = new double[n]; 
+        double* temp;
         int i, j;
-        real val;
-        int size = n/nw;
-        for (int k = 0; k < iterations; k++) {
-            #pragma omp parallel for private(i, j, val) num_threads(nw)
+        int k = 0;
+        while (k < iterations) {
+            #pragma omp parallel for schedule(static) num_threads(nw)
             for (i = 0; i < n; i++) {
-                val = 0;
+                x_aux[i] = 0;
                 for (j = 0; j < n; j++) {
-                    val += (j != i ? A[i][j]*x[j] : 0);
+                    if (i != j) {
+                        x_aux[i] -= A[i][j]*x[j];
+                    }
                 }
-                x_aux[i] = (b[i] - val)/A[i][i];
+                x_aux[i] = (x_aux[i] + b[i])/A[i][i];
             }
+            
             temp = x_aux;
             x_aux = x;
-            x = temp;
+            x = temp;   
+            k+=1;
+
         }
         delete x_aux;
     }

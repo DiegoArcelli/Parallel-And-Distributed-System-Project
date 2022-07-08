@@ -40,24 +40,6 @@ def show_plot(x_label, y_label, title, file_name, n_cores, threads, ff, omp, seq
         plt.show()
     plt.close()
 
-def show_plot_types(x_label, y_label, title, file_name, n_cores, floats, doubles, long_doubles):
-    plt.xlabel(x_label, fontsize=30)
-    plt.ylabel(y_label, fontsize=30)
-    # plt.title(title, fontsize=25)
-    plt.xticks(fontsize=30)
-    plt.yticks(fontsize=30)
-    width = 3
-    plt.plot(n_cores, floats, label="float", linestyle="solid", color="#c1c0be", linewidth=width)
-    plt.plot(n_cores, doubles, label="double", linestyle='dashed', color="#82817d", linewidth=width)
-    plt.plot(n_cores, long_doubles, label="long double", linestyle='dotted', color="#000000", linewidth=width)
-    plt.legend(fontsize=30)
-    plt.savefig(f"./plots/{file_name}.png", dpi=100, bbox_inches='tight')
-    print(f"Saved: ./plots/{file_name}.png")
-    if show_flag:
-        plt.show()
-    plt.close() 
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--show", "-s", action=argparse.BooleanOptionalAction)
 parser.add_argument("--output", "-o", type=str, default="experiment")
@@ -109,23 +91,3 @@ threads_sp = get_speedup(seq_times, threads_times)
 ff_sp = get_speedup(seq_times, ff_times)
 omp_sp = get_speedup(seq_times, omp_times)
 show_plot("Size", "Speedup", "Speedup vs Size", f"speedup_vs_size", [str(x) for x in sizes], threads_sp, ff_sp, omp_sp)
-
-
-float_data = pd.read_csv("ff_results_float.csv", sep=";")
-double_data = pd.read_csv("ff_results_double.csv", sep=";")
-long_double_data = pd.read_csv("ff_results_long_double.csv", sep=";")
-
-partial = pd.merge(float_data, double_data, how="inner", on="n_cores")
-all_data = pd.merge(partial, long_double_data, how="inner", on="n_cores")
-f_seq = all_data["seq_time_x"].to_numpy()
-f_par = all_data["ff_time_x"].to_numpy()
-d_seq = all_data["seq_time_y"].to_numpy()
-d_par = all_data["ff_time_y"].to_numpy()
-ld_seq = all_data["seq_time"].to_numpy()
-ld_par = all_data["ff_time"].to_numpy()
-
-f_sp = get_speedup(f_seq, f_par)
-d_sp = get_speedup(d_seq, d_par)
-ld_sp = get_speedup(ld_seq, ld_par)
-show_plot_types("Workers", "Speedup", "Speedup vs Workers", f"data_types_speedup", n_cores, f_sp, d_sp, ld_sp)
-

@@ -1,16 +1,15 @@
 #include <cstdlib>
 #include <ctime>
 
-typedef float real;
 
-inline int sign(real x) {
+inline int sign(double x) {
     return ((x >= 0) - (x < 0));
 }
 
-inline real* generate_random_vector(int n) {
+inline double* generate_random_vector(int n) {
     
     srand(time(NULL));
-    real* b = new real[n];
+    double* b = new double[n];
 
     for (int i = 0; i < n; i++) {
         b[i] = (rand() % 20) - 10;
@@ -18,20 +17,20 @@ inline real* generate_random_vector(int n) {
     return b;
 } 
 
-inline real** generate_diagonal_dominant_matrix(int n) {
+inline double** generate_diagonal_dominant_matrix(int n) {
 
     srand(time(NULL));
-    real** A = new real*[n];
+    double** A = new double*[n];
     
     for (int i = 0; i < n; i++) {
-        A[i] = new real[n];
+        A[i] = new double[n];
         for (int j = 0; j < n; j++) {
             A[i][j] = (rand() % 20 ) - 10;
         }
     }
  
     for (int i = 0; i < n; i++) {
-        real sum = 0; 
+        double sum = 0; 
         for (int j = 0; j < n; j++) {
             if (i != j) {
                 sum += abs(A[i][j]);

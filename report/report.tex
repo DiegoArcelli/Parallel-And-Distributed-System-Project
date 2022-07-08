@@ -174,9 +174,6 @@
 	\end{itemize}
 	To compare the performances of the three implementations we'll measure the times obtained when executing the algorithm with $nw$ workers, varying $nw$ from 1 to 128. Then from the times we'll derive the speedup and the efficiency of the three implementations. To see if the size of the matrix impact on the performances, we'll repeat this procedure twice, first on 1000$\times$1000 matrix and then on a 1000$\times$1000 matrix.\\
 	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (500, 1000, 5000, 10000, 15000, 20000) to better understand the impact that the size of the matrix has on the performances.\\
-	Another interesting fact that I encountered during the experiments and I think it's worth mentioning, is  that the data type of the elements of the matrix has a significant impact on the achieved speedup of the parallel implementations. Using \verb|floats| data type yields to better speedups than using \verb|double| or \verb|long double|. Because of this I also inserted a plot that shows the different speedup achieved by the FastFlow implementation for the three C++ floating point data type \verb|float|, \verb|double| and \verb|long double|. \\
-	To get the times I created a \verb|timer| class which uses the RAII mechanism to print the difference between the time in which it's created and the time in which it's destructed, as we saw during the lectures. In the execution time are included the declaration of some variable and the allocation and deallocation of the auxiliary array in the main memory, but not the initialization of vector $x$.\\
-	The results of the experiments are shown in the below plots:
 	
 	\begin{figure}[H]
 		\centering
@@ -218,12 +215,6 @@
 		\centering
 		\includegraphics[width=13cm]{./images/speedup_vs_size}
 		\caption{Speedup vs matrix size with 32 workers}
-	\end{figure}
-
-	\begin{figure}[H]
-		\centering
-		\includegraphics[width=13cm]{./images/data_types_speedup}
-		\caption{Data types comparison}
 	\end{figure}
 
 

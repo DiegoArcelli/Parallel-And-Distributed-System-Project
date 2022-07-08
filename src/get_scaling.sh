@@ -8,10 +8,9 @@ cores=$1;
 iters=$2;
 avg_iters=1;
 
-
 echo "n;seq_time;threads_time;ff_time;omp_time" > "scaling.csv";
 
-for n in 500 1000 2000 5000 10000 15000 20000
+for n in 100 200 500 1000 2000 5000 10000 15000 20000
 do
     seq_avg=0;
     threads_avg=0;

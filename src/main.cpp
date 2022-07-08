@@ -31,14 +31,14 @@ int main(int argc, char *argv[]) {
 
     Jacobi prob(n);
 
-    real* x;
+    double* x;
 
     if (mode < 2) {
         x = prob.sequential(iters);
     }
 
     if (mode == 0 || mode == 2 || mode == 3) {
-        x = prob.parallel("threads", iters, nw);
+        x = prob.parallel("cpp", iters, nw);
     }
 
     if (mode == 0 || mode == 2 || mode == 4) {
