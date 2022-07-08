@@ -38,51 +38,51 @@
 	\newpage
 	
 	\section{Analysis of the problem}
-	Notation premise: with $x_i^{(k)}$ we indicate the $i$-th entry of vector $x$ at iteration $k$. The pseudo-code to execute the Jacobi method sequentially, for a fixed amount of iterations, is shown in \ref{alg:seq}. Note that we are forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because if at iteration $k$, we compute $x^{(k)}_1$ modifying $x$ in-place, then when we'll compute $x^{(k+1)}_2$, instead of using $x^{(k)}_1$, we'll use $x^{(k+1)}_1$.\\
+	Notation premise: with $x_i^{(k)}$ we indicate the $i$-th entry of vector $x$ at iteration $k$. The pseudo-code to execute the Jacobi method sequentially, for a fixed amount of iterations, is shown in \ref{alg:seq}. Note that we are forced to use an auxiliary vector $x^\prime$ to compute the updated elements of $x$ for the current iteration, and then, before starting the following iteration, we copy the elements of $x^\prime$ in $x$. This is necessary because if at iteration $k$ we compute $x^{(k)}_1$ modifying $x$ in-place, then when we'll compute $x^{(k)}_2$, instead of using $x^{(k-1)}_1$, we'll use $x^{(k)}_1$.\\
 	The algorithm is composed by three nested loops, where the first iterates $limit$ times, and the other two iterate $n$ times, so the time complexity is $O(limit\cdot n^2)$. The $swap$ function used to copy the elements of $x^\prime$ in $x$, can be implemented in $O(1)$ time complexity, by swapping the pointers of the two arrays.
 	\begin{algorithm}[H]
 		\caption{Sequential code for Jacobi method}\label{alg:seq}
 		\begin{algorithmic}[1]
-			\Require $A$ strictly diagonal dominant matrix, $b$ vector, $limit$ positive integer
+			\Require $A$ strictly diagonally dominant matrix, $b$ vector, $limit$ positive integer
 			\For{$k \gets 1$ to $limit$}
 			\For{$i \gets 1 $ to $n$}
-			\State{$val \gets 0$}
+			\State{$x^\prime[i] \gets 0$}
 			\For{$j \gets 1 $ to $n$}
 			\If{$j \ne i$}
-			\State{$val \gets val + A[i,j]* x[j]$}
+			\State{$x^\prime[i]  \gets x^\prime[i] - A[i,j]* x[j]$}
 			\EndIf
 			\EndFor
-			\State{$x^\prime[i] \gets \frac{1}{A[i,i]}(b[i]-val)$}
+			\State{$x^\prime[i] \gets (x^\prime[i] + b[i])/A[i,i]$}
 			\EndFor
 			\State{swap($x$, $x^\prime$)}
 			\EndFor
 		\end{algorithmic}
 	\end{algorithm}
 	\noindent Let's now analyze how we can exploit the properties of the algorithm in order to parallelize it. The first important thing we notice is that in order to compute the updated values for the vector $x$ at iteration $k$, we need the full updated vector $x$ at iteration $k-1$, therefore the iterations of the algorithm need to be strictly sequential.\\
-	A relevant property of the algorithm that we can notice from the pseudo-code, is that each element $x_i^{(k)}$ is computed independently from the others elements of the vector $x^{(k)}$, since to compute $x_i^{(k)}$ we just need the old vector $x^{(k-1)}$ and the matrix $A$. Therefore the iterations¸ of the loop at line 2 of the pseudo-code, can be executed in parallel, which is the classical application of a map pattern. So, if we have $nw$ workers available, we can assign to each worker a partition of indices of $x$ to compute.\\
-	The innermost loop at line 4 is used to compute a sum of $n-1$ elements, which is the classical application of a reduce pattern. This is done inside the loop that we already said we can parallelize using a map pattern, so, if we want to implement also the reduce, for each one of the $nw$ workers of the map, we have to arrange other $nw^\prime$ additional workers that can be used to compute in parallel the summation.\\
-	The introduction of a reduce inside each map would increase the overhead, since each worker assigned to the map would have to coordinate its computations with the workers that it uses for the reduce. Moreover, if the additional $nw\cdot nw^\prime$ workers arranged for the reduce, are just used to increase the parallel degree of the map, we would obtain the same theoretical speedup (this is shown in the time analysis section) but which much less overhead. Therefore there is no advantage in implementing the reduce.\\
+	A relevant property of the algorithm that we can notice from the pseudo-code, is that each element $x_i^{(k)}$ is computed independently from the others elements of the vector $x^{(k)}$, since to compute $x_i^{(k)}$ we just need the old vector $x^{(k-1)}$ and the matrix $A$. Therefore the iterations of the loop at line 2 of the pseudo-code, can be executed in parallel, which is the classical application of a map pattern. So, if we have $nw$ workers available, we can assign to each worker a partition of indices of $x$ to compute.\\
+	The innermost loop at line 4 is used to compute a sum of $n-1$ elements, which is the classical application of a reduce pattern. This is done inside the loop that we already said we can parallelize using a map pattern, so if we want to implement also the reduce, for each one of the $nw$ workers of the map, we have to arrange other $nw^\prime$ additional workers that can be used to compute in parallel the summation.\\
+	The introduction of a reduce inside each map would increase the overhead, since each worker assigned to the map would have to coordinate its computations with the workers that it uses for the reduce. Moreover, if the additional $nw\cdot nw^\prime$ workers arranged for the reduce, are just used to increase the parallel degree of the map, we would obtain the same theoretical speedup (this is shown in the time analysis section) but which much less overhead. Therefore I decided to do not implement the reduce.\\
 	Even if we only implement the map, there some synchronization problems that we need to care about:
 	\begin{enumerate}
 		\item Start iteration $k+1$ only after all the workers finished their computations for iteration $k$, since the iterations must be strictly sequential 
 		\item Executing the swap of the main and auxiliary vectors only after all the workers finished their computations for the current iteration, otherwise it might happen that the vectors are swapped while some workers are still computing their portion of $x^{(k)}$
 		\item Keep track of the number of iterations so that all the workers will stop after $limit$ iterations
 	\end{enumerate}
-	The first problem can be solved simply by putting a barrier after the execution of the map, so that all the worker will be forced to wait the others before starting the next iteration. In this way we can also solve the third problem by selecting one of the worker to count the number of iterations of the algorithm executed so far. The designated worker can simply use a shared variable among the workers, that it will increase by one before the barrier. Since the variable is modified by just one worker it doesn't need synchronization mechanism to be accessed even if it is shared. This solution guarantees that before starting iteration $k$ the shared variable will have value $k$ for all the workers, so that every worker can individually check if $k = limit$ and stop its execution if it is the case. To solve the second problem we need to introduce a second barrier, which has to be placed between the end of the map an the previously defined next iteration barrier. Between this new defined barrier and the next iteration barrier, one of the workers will be selected to execute the swap (it can be the same one that counts the iterations). In this way the swap will happen only after every worker finished its computations for the current iteration and before starting the next iteration.\\
+	The first problem can be solved simply by putting a barrier after the execution of the map, so that all the worker will be forced to wait the others before starting the next iteration. In this way we can also solve the third problem by selecting one of the worker to count the number of iterations of the algorithm executed so far. The designated worker can simply use a shared variable among the workers, that it will increase by one before the barrier. Since the variable is modified by just one worker it doesn't need synchronization mechanism to be accessed, even if it is shared. This solution guarantees that before starting iteration $k$ the shared variable will have value $k$ for all the workers, so that every worker can individually check if $k = limit$ and stop its execution if it is the case. To solve the second problem we need to introduce a second barrier, which has to be placed between the end of the map an the previously defined next iteration barrier. Between this new defined barrier and the next iteration barrier, one of the workers will be selected to execute the swap (it can be the same one that counts the iterations). In this way the swap will happen only after every worker finished its computations for the current iteration and before starting the next iteration.\\
 	The pseudo-code of the routine executed by a worker is showed in \ref{alg:par}.
 	\begin{algorithm}[H]
 		\caption{Worker pseudo-code}\label{alg:par}
 		\begin{algorithmic}[1]
-			\Require $A$ strictly diagonal dominant matrix, $b$ vector, $limit$ positive integer
+			\Require $A$ strictly diagonally dominant matrix, $b$ vector, $limit$ positive integer
 			\While{$k < limit$}
 			\For{$i \gets start $ to $end$}
-			\State{$val \gets 0$}
+			\State{$x^\prime[i] \gets 0$}
 			\For{$j \gets 1 $ to $n$}
 			\If{$j \ne i$}
-			\State{$val \gets val + A[i,j]* x[j]$}
+			\State{$x^\prime[i] \gets x^\prime[i] - A[i,j]* x[j]$}
 			\EndIf
 			\EndFor
-			\State{$x^\prime[i] \gets \frac{1}{A[i,i]}(b[i]-val)$}
+			\State{$x^\prime[i] \gets (x^\prime[i] + b[i])/A[i,i]$}
 			\EndFor
 			\State{\textbf{Vectors swap barrier}}
 			\If{start = 0}
@@ -93,7 +93,7 @@
 			\EndWhile
 		\end{algorithmic}
 	\end{algorithm}
-	\noindent The variables $start$ and $end$ represent respectively the first and the last index of $x$ assigned to the worker. The worker that will update the iterations counter and execute the swap of the vector is the one assigned to the leftmost chunk (the one with $start = 0$). Note that both of the barriers are needed because if we only use the copy barrier, it could happen that one of the workers might start the next iteration before the designated worker could swap the vectors and update the iteration counter, so both barriers are needed. 
+	\noindent The variables $start$ and $end$ represent respectively the first and the last index of $x$ assigned to the worker. The worker that will update the iterations counter and execute the swap of the vectors is the one assigned to the leftmost chunk (the one with $start = 0$). Note that both of the barriers are needed because if we only use the copy barrier, it could happen that one of the workers might start the next iteration before the designated worker could swap the vectors and update the iteration counter, so both barriers are needed. 
 	
 	
 	\section{Time analysis}
@@ -121,14 +121,14 @@
 	\section{Implementation details}
 	The parallel program has been implemented in three versions:
 	\begin{itemize}
-		\item[--] The first using C++ threads 
+		\item[--] The first using native C++ threads 
 		\item[--] The second using FastFlow
 		\item[--] The third using OpenMP
 	\end{itemize}
-	The program has been implemented defining a class called \verb|Jacobi| which has as attributes the coefficients matrix $A$, the vector of known terms $b$ and an integer $n$ that is the size of $A$ and $b$. For each implementation of the algorithm (the sequential and the three parallel ones) there's a corresponding method to solve the linear system $Ax = b$, using that specific implementation, by providing as parameters the number of iterations of the algorithm and the number of workers (for the parallel versions). For all the implementations the solution vector $x$ is initialized setting all the elements to 0, and to assure that algorithm will converge, $A$ it's generated randomly to be strictly diagonal dominant. 
-	
+	The program has been implemented defining a class called \verb|Jacobi| which has as attributes the coefficients matrix $A$, the vector of known terms $b$ and an integer $n$ that is the size of $A$ and $b$. For each implementation of the algorithm (the sequential and the three parallel ones) there's a corresponding method to solve the linear system $Ax = b$, using that specific implementation, by providing as parameters the number of iterations of the algorithm and the number of workers (for the parallel versions). For all the implementations the solution vector $x$ is initialized setting all the elements to 0, and to assure that algorithm will converge, $A$ it's generated randomly to be strictly diagonally dominant. 
+	tends to 
 	\subsection{C++ threads}
-	In the implementation with C++ threads I used the fork-join mechanism to spawn $nw$ threads, each of them is assigned to a contiguous chunk of $x$ of size $\lfloor\frac{n}{nw}\rfloor$ according to the following procedure:
+	In the implementation with native C++ threads I used the fork-join mechanism to spawn $nw$ threads, each of them is assigned to a contiguous chunk of $x$ of size $\lfloor\frac{n}{nw}\rfloor$ according to the following procedure:
 	\begin{algorithmic}
 		\State $\Delta \gets \lfloor\frac{n}{nw}\rfloor$
 		\For{$i \gets 0$ to  $nw$}
@@ -142,18 +142,18 @@
 	For the FastFlow implementation I used the \verb|ParalleFor| class to parallelize the loop at line 2 of \ref{alg:seq}. An object of class \verb|ParalleFor| is created before the loops start, in order to prepare the $nw$ workers in advance, and then we call the \verb*|parallel_for| method, inside the main loop of of the algorithm. The function passed to the parallel:
 	\begin{algorithmic}
 		\Function{parallel\_for\_iteration}{$i$}
-		\State $val \gets 0$
+		\State $x^\prime[i] \gets 0$
 		\For{$j \gets 0$ to  $n-1$}
 		\If{$i \ne j$}
-		\State $val \gets val + A[i,j]$
+		\State $x^\prime[i] \gets x^\prime[i] - A[i,j]*x[j]$
 		\EndIf
 		\EndFor
-		\State $x^\prime[i] = (b[i]-val)/A[i,i]$
+		\State $x^\prime[i] \gets (x^\prime[i] + b[i])/A[i,i]$
 		\EndFunction
 	\end{algorithmic}
 	After the call of the parallel for method, the counter of the loop is increased and the vectors are swapped, and this is done sequentially by the main thread of the program. Note that we do not need to explicitly define the barrier since the call of the \verb*|parallel_for| method is an implicit barrier for the workers. 
 	\subsection{OpenMP}
-	For the OpenMP implementation I simply parallelized the second innermost loop at line 2 of algorithm \ref{alg:seq}, using the \verb|#pragama omp paralle for| directive, with the default static scheduling, which divides the loop in $nw$ chunks of equal size. Like in the case of FastFlow, the end of the parallelized for is an implicit barrier for the threads used in the parallel for, so we do not need to define the barrier explicitly.  
+	For the OpenMP implementation I simply parallelized the second innermost loop at line 2 of algorithm \ref{alg:seq}, using the \verb|#pragama omp paralle for| directive, with the default static scheduling, which divides the loop in $nw$ chunks of equal size. Like in the case of FastFlow, the end of the parallelized for is an implicit barrier for the threads, so we do not need to define the barrier explicitly.  
 	\section{Manual}
 	The source code, the scripts written for the experiments and a detailed manual of the program are available at \href{https://github.com/DiegoArcelli/Parallel-And-Distributed-Systems-Project}{this} repository.\\ 
 	To compile the code is sufficient to execute the command \verb*|make| in the \verb*|src| directory of the project. The compilation will produce the executable \verb*|main| which can be launched to execute the program, providing the following arguments:
@@ -172,8 +172,8 @@
 		\item[--] Check how the performances change with respect to the size of the matrix
 		\item[--] Comparing the actual performances to the ideal ones
 	\end{itemize}
-	To compare the performances of the three implementations we'll measure the times obtained when executing the algorithm with $nw$ workers, varying $nw$ from 1 to 128. Then from the times we'll derive the speedup and the efficiency of the three implementations. To see if the size of the matrix impact on the performances, we'll repeat this procedure twice, first on 1000$\times$1000 matrix and then on a 1000$\times$1000 matrix.\\
-	After that we'll select the number of workers for which we obtain the best speedup and we'll execute the algorithms with that number of workers for matrices of different sizes (500, 1000, 5000, 10000, 15000, 20000) to better understand the impact that the size of the matrix has on the performances.\\
+	To compare the performances of the three implementations we'll measure the times obtained when executing the algorithm with $nw$ workers, varying $nw$ from 1 to 32 (which is the number of cores of the machine used for the experiments). Then from the times we'll derive the speedup and the efficiency of the three implementations. To see if the size of the matrix impact on the performances, we'll repeat this procedure twice, first on 1000$\times$1000 matrix and then on a 10000$\times$10000 matrix.\\
+	After that we'll execute the algorithms with a fixed number of workers on matrices of different sizes (500, 1000, 5000, 10000, 15000, 20000) to better understand the impact that the size of the matrix has on the performances.\\ 
 	
 	\begin{figure}[H]
 		\centering
@@ -215,12 +215,14 @@
 		\centering
 		\includegraphics[width=13cm]{./images/speedup_vs_size}
 		\caption{Speedup vs matrix size with 32 workers}
+		\label{fig:speed_vs_size}
 	\end{figure}
 
 
 	\section{Conclusions}
-	The first thing that we notice from the experiments is that the performances are much better in the experiment where the matrix size is larger. When $n = 1000$ the maximum speedup (which is less then 8) around 10-20 workers, and then it starts to decrease. While in the case where $n = 10000$ we reach the maximum speedup again with more or less 10-20 workers, but then it remains stable around 8-10 even with an higher number of workers. Consequentially also the efficiency decrease slower when $n$ is large. This is also confirmed by figure \ref{fig:scaling}, that shows how the speedup increases while the matrix size increases. Probably executing test on larger matrices would bring a even better speedup, but the remote machine stopped the execution of the program when I tried with larger matrix sizes. Probably the better performances with larger sizes of the matrices are due to the fact, that increasing the size cause the grain of the computation of each worker to be coarser, and so the overhead has a reduced impact on the performances.\\
-	In the case of $n = 1000$ we can se that with less than 20 workers, the OpenMP implementation is by far the better one, then as the number of threads increases the performances of the three versions are more or less the same, with FastFlow which tends to do slightly better. For $n = 10000$ we can se that the performances of the implementations are almost identical, even in this case at the beginning OpenMP tends to do slightly better, and FastFlow does a little bit better when the number of threads gets high.\\
+	The first thing that we notice from the experiments is that the performances gets better as the dimension of the matrix increases. The speedups reached when $n$ is large are better than those reached when $n$ is small. Because of this, also the efficiency decreases slower when $n$ is large. Moreover figure \ref{fig:speed_vs_size} shows that when we fix the number of worker, increase the size of the matrix produces better speedups. This is probably due to the fact that as $n$ increases, also the coarse of the computations increases, since a single worker has to compute bigger chunks.\\
+	In the case of $n = 1000$, the OpenMP implementations tends to do much better then the other two, and FastFlow does better than the native C++ threads implementation. For the experiments with $n = 10000$ the performances of the three implementations are very similar, even if also in this case the OpenMP versions does a little bit better than the other two, and FastFlow does a little bit better of the native C++ threads implementation. The fact that OpenMP is the best version is probably due to the fact that is though to optimize data parallel computations. \\
+	From the plots we can see that the the speedups tends to be close to the linear one, when the number of workers is small. As the number of workers increases, the efficiency tends to decrease. One possible causes of this is the fact that with few workers the grain of the computations is larger, since we have to handle less threads, and each threads has to do more computations. Since the speedup increases with $n$, maybe with larger values of $n$, even with an higher number of workers the speed up would have remained close to the linear one (I couldn't test this hypothesis since with $n = 50000$ the remote machine killed the process).
 	
 	
 \end{document}

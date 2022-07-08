@@ -173,7 +173,7 @@ double* Jacobi::parallel_omp(int iterations, int nw) {
         int i, j;
         int k = 0;
         while (k < iterations) {
-            #pragma omp parallel for schedule(static) num_threads(nw)
+            #pragma omp parallel for schedule(static) private(i,j) num_threads(nw)
             for (i = 0; i < n; i++) {
                 x_aux[i] = 0;
                 for (j = 0; j < n; j++) {

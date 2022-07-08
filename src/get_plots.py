@@ -59,7 +59,7 @@ seq_times = data_cores["seq_time"].to_numpy()
 threads_times = data_cores["threads_time"].to_numpy()
 ff_times = data_cores["ff_time"].to_numpy()
 omp_times = data_cores["omp_time"].to_numpy()
-show_plot("Workers", "Time", "Time vs Workers", f"time_vs_cores_{file_name}", n_cores, threads_times, ff_times, omp_times, seq_times)
+show_plot("Workers", "Time (nanoseconds)", "Time vs Workers", f"time_vs_cores_{file_name}", n_cores, threads_times, ff_times, omp_times, seq_times)
 
 threads_sp = get_speedup(seq_times, threads_times)
 ff_sp = get_speedup(seq_times, ff_times)
