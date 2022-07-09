@@ -1,17 +1,17 @@
 #!/bin/bash
 
-if [ $# -le 2 ] 
+if [ $# -le 3 ] 
 then 
-    echo "Usage: ./experiments.sh n iters cores";
+    echo "Usage: ./experiments.sh n iters cores avg_iters";
     exit;
 fi
 
 n=$1;
 iters=$2;
 n_cores=$3
-avg_iters=5;
+avg_iters=$4;
 
-echo "n_cores;seq_time;threads_time;ff_time;omp_time" > "results.csv";
+echo "n_cores;seq_time;threads_time;ff_time;omp_time" > "results_$n.csv";
 
 
 # getting sequential time
@@ -48,5 +48,5 @@ do
     omp_avg=$(echo "scale=2;$omp_avg/$avg_iters" | bc -l);
 
     echo "$cores cores executed";
-    echo "$cores;$seq_avg;$threads_avg;$ff_avg;$omp_avg" >> "results.csv";
+    echo "$cores;$seq_avg;$threads_avg;$ff_avg;$omp_avg" >> "results_$n.csv";
 done

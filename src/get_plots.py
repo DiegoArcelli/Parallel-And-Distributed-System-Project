@@ -77,7 +77,7 @@ show_plot("Workers", "Efficiency", "Efficiency vs Workers", f"efficiency_vs_core
 # omp_scale = get_scaling(omp_times)
 # show_plot("Cores", "Scaling", "Scaling vs Cores", f"scaling_vs_cores_{file_name}", n_cores, threads_scale, ff_scale, omp_scale)
 
-data_scale = pd.read_csv("scaling.csv", sep=";")
+data_scale = pd.read_csv("scaling_16.csv", sep=";")
 sizes = data_scale["n"].to_numpy()
 seq_times = data_scale["seq_time"].to_numpy()
 threads_times = data_scale["threads_time"].to_numpy()
