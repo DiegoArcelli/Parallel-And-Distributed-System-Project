@@ -134,7 +134,7 @@
 			\State $start_i \gets i*\Delta$
 			\State $end_i \gets start_i + \Delta - 1$
 		\EndFor
-		\State $end_{nw} \gets n-1$
+		\State $end_{nw-1} \gets n-1$
 	\end{algorithmic}
 	Then each thread will execute code identical to the one in \ref{alg:par}. For the implementation of the barrier I used the \verb*|barrier| class introduced in C++20.
 	\subsection{FastFlow}
