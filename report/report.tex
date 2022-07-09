@@ -130,7 +130,7 @@
 	In the implementation with native C++ threads I used the fork-join mechanism to spawn $nw$ threads, each of them is assigned to a contiguous chunk of $x$ of size $\lfloor\frac{n}{nw}\rfloor$ according to the following procedure:
 	\begin{algorithmic}
 		\State $\Delta \gets \lfloor\frac{n}{nw}\rfloor$
-		\For{$i \gets 0$ to  $nw$}
+		\For{$i \gets 0$ to  $nw-1$}
 			\State $start_i \gets i*\Delta$
 			\State $end_i \gets start_i + \Delta - 1$
 		\EndFor
