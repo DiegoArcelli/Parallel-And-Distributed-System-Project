@@ -50,7 +50,6 @@ int main(int argc, char *argv[]) {
         x = prob.parallel("omp", iters, nw);
     }
 
-
-
+    return 0;
 
 }
